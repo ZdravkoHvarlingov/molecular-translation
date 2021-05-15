@@ -1,4 +1,5 @@
 from collections import Counter
+from tqdm import tqdm
 
 
 class Vocabulary:
@@ -18,7 +19,7 @@ class Vocabulary:
     
     def build_vocab(self, sentence_list, freq_threshold):
         frequencies = Counter()
-        for sentence in sentence_list:
+        for sentence in tqdm(sentence_list, position=0, leave=True):
             for word in self.tokenize(sentence):
                 frequencies[word] += 1
         
@@ -32,7 +33,7 @@ class Vocabulary:
         #string to int tokens
         stoi = {token: idx for idx, token in enumerate(words)} 
         #its reverse dict self.itos
-        itos = {idx: token for token, idx in self.stoi.items()}
+        itos = {idx: token for token, idx in stoi.items()}
 
         return stoi, itos
                 
