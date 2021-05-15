@@ -1,5 +1,4 @@
 bms-molecular-translation/
-*.ipynb
 *.zip
 .ipynb_checkpoints/
 
