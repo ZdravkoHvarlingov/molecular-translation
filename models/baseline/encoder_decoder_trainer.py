@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
+import numpy as np
 import torch.optim as optim
 
-from common.dataset import retrive_dataloader
+from common.dataset import retrieve_evaluate_dataloader, retrieve_train_dataloader
 from common.vocabulary import Vocabulary
 from models.baseline.encoder_decoder import EncoderDecoder
 from Levenshtein import distance as levenshtein_distance
@@ -24,8 +25,6 @@ class EncoderDecoderTrainer:
     
     def train(self, dataframe, num_epochs=10, load_state_file=None):
         torch.cuda.empty_cache()
-        dataloader = retrive_dataloader(dataframe, self.vocab, batch_size=4)
-
         saved_params = None
         trained_epochs = 0
         if load_state_file is not None:
@@ -48,16 +47,20 @@ class EncoderDecoderTrainer:
             model.load_state_dict(saved_params['state_dict'])
         model.train()
 
-        self._perform_training(dataloader, model, num_epochs, trained_epochs)
+        self._perform_training(dataframe, model, num_epochs, trained_epochs)
 
+    def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0):
+        train_df, validation_df, test_df = self._split_train_val_test(dataframe)
+        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=4)
 
-    def _perform_training(self, dataloader, model, num_epochs, trained_epochs=0):
         print_every = 10
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
         optimizer = optim.Adam(model.parameters(), lr = 3e-4)
         vocab_size = len(self.vocab)
 
         iteration = 0
+        train_losses = []
+        val_losses = []
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1)):
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 #imageTensor, captions = imageTensor.to(device), captions.to(device)
@@ -73,18 +76,36 @@ class EncoderDecoderTrainer:
                 optimizer.step()
                 
                 if (iteration + 1) % print_every == 0:
-                    print("Epoch: {} loss: {:.5f}".format(epoch,loss.item()))
-                    
                     model.eval()
-                    self.evaluate_model(model, dataloader)
+                    train_loss = self._evaluate_model(self.vocab, model, train_df)
+                    train_losses.append(train_loss)
+                    val_loss = self._evaluate_model(self.vocab, model, validation_df)
+                    val_losses.append(val_loss)
                     model.train()
+
+                    print(f'Train loss: {train_loss}')
+                    print(f'Validation loss: {val_loss}')
                 
                 iteration += 1
                     
             self.save_model(model, epoch)
-
-    def evaluate_model(self, model, dataloader, losses=None, levenshtein_distances=None):
+        
+    def _evaluate_model(self, vocab: Vocabulary, model, dataframe):
+        vocab_size = len(vocab)
+        losses = []
         with torch.no_grad():
+            loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
+            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=4, shuffle=False)
+            
+            for image, captions in tqdm(dataloader, position=0, leave=True):
+                #imageTensor, captions = imageTensor.to(device), captions.to(device)
+                image, captions = image.to(device), captions.to(device)
+                outputs, _ = model(image, captions)
+                targets = captions[:, 1:]
+                
+                loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
+                losses.append(loss.detach().item())
+
             dataiter = iter(dataloader)
             img, original_captions  = next(dataiter)
             features = model.encoder(img[0:1].to(device))
@@ -99,7 +120,17 @@ class EncoderDecoderTrainer:
             levenshtein_metric = levenshtein_distance(original_caption, caption)
             print(f'Levenshtein distance: {levenshtein_metric}')
 
-    def save_model(self, model, num_epochs):
+            return np.mean(losses)
+
+    def _split_train_val_test(self, dataframe):
+        train=dataframe.sample(frac=0.7,random_state=11) #random state is a seed value
+        val_test=dataframe.drop(train.index)
+        val = val_test.sample(frac=0.5, random_state=12)
+        test = val_test.drop(val.index)
+
+        return train, val, test
+
+    def _save_model(self, model, num_epochs):
         model_state = {
             'num_epochs':num_epochs,
             'embed_size':self.embed_size,

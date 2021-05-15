@@ -9,15 +9,9 @@ from torchvision.transforms.transforms import Compose, Normalize, Resize, Random
 
 
 class MoleculesDataset(Dataset):
-    def __init__(self, data_df, vocab):
+    def __init__(self, data_df, vocab, transform):
         self.df = data_df
-        self.transform = Compose([
-            RandomVerticalFlip(),
-            RandomHorizontalFlip(),
-            RandomRotation(180),
-            Resize((256,256)),
-            Normalize(mean=[0.5], std=[0.5]),
-        ])
+        self.transform = transform
         self.vocab = vocab
         
     def __len__(self):
@@ -58,9 +52,36 @@ class CapsCollate:
         return imgs,targets
 
 
-def retrive_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True):
+def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True):
     pad_idx = vocab.stoi['<PAD>']
-    dataset = MoleculesDataset(dataframe, vocab)
+    transform = Compose([
+        RandomVerticalFlip(),
+        RandomHorizontalFlip(),
+        RandomRotation(180),
+        Resize((256,256)),
+        Normalize(mean=[0.5], std=[0.5]),
+    ])
+
+    dataset = MoleculesDataset(dataframe, vocab, transform)
+    dataloader = DataLoader(
+        dataset, 
+        batch_size=batch_size, 
+        shuffle=shuffle,
+        num_workers=0, 
+        pin_memory=True,
+        collate_fn=CapsCollate(pad_idx=pad_idx,batch_first=True)
+    )
+
+    return dataloader
+
+def retrieve_evaluate_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True):
+    pad_idx = vocab.stoi['<PAD>']
+    transform = Compose([
+        Resize((256,256)),
+        Normalize(mean=[0.5], std=[0.5])
+    ])
+
+    dataset = MoleculesDataset(dataframe, vocab, transform)
     dataloader = DataLoader(
         dataset, 
         batch_size=batch_size, 
