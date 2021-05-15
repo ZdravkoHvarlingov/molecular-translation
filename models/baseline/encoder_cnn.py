@@ -5,7 +5,7 @@ import torchvision.models as models
 class EncoderCNN(nn.Module):
     def __init__(self):
         super(EncoderCNN, self).__init__()
-        resnet = models.resnet50(pretrained=False)
+        resnet = models.resnet50(pretrained=True)
         resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         for param in resnet.parameters():
             param.requires_grad_(True)

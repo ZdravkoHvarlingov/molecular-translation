@@ -52,8 +52,7 @@ class DecoderRNN(nn.Module):
             
         return preds, alphas
     
-    def generate_caption(self, features, max_length=120, vocab=None):
-        
+    def generate_caption(self, features, max_length=1200, vocab=None):
         batch_size = features.size(0)
         h, c = self.init_hidden_state(features)
         
