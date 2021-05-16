@@ -1,3 +1,4 @@
+from common.vocabulary import Vocabulary
 import torch
 import torch.nn as nn
 from models.baseline.attention import Attention
@@ -27,6 +28,9 @@ class DecoderRNN(nn.Module):
         self.dropout = nn.Dropout(drop_prob)
         
     def forward(self, features, captions):
+         # features shape = [batch_size, 64, 2048]
+         # captions shape = [batch_size, max_length]
+         # embeds shape = [batch_size, max_length, embed_size]
         embeds = self.embedding(captions)
         
         #initialize LSTM state
@@ -49,9 +53,15 @@ class DecoderRNN(nn.Module):
             
             preds[:, s] = output
             alphas[:, s] = alpha
-            
+        
+        # print(preds.shape)
         return preds, alphas
     
+    def generate_caption_from_predictions(self, predictions, vocab: Vocabulary):
+        predicted_word_idx = predictions.argmax(dim=2)
+
+        return predicted_word_idx
+
     def generate_caption(self, features, max_length=1200, vocab=None):
         batch_size = features.size(0)
         h, c = self.init_hidden_state(features)

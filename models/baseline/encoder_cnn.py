@@ -16,5 +16,6 @@ class EncoderCNN(nn.Module):
         features = self.resnet(images)
         features = features.permute(0, 2, 3, 1)
         features = features.view(features.size(0), -1, features.size(-1))
-        # print(features.shape)
+
+        # shape = [batch_size, 64, 2048]
         return features

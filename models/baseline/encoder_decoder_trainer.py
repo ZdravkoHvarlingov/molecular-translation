@@ -8,6 +8,7 @@ from common.vocabulary import Vocabulary
 from models.baseline.encoder_decoder import EncoderDecoder
 from Levenshtein import distance as levenshtein_distance
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -59,11 +60,10 @@ class EncoderDecoderTrainer:
         vocab_size = len(self.vocab)
 
         iteration = 0
-        train_losses = []
-        val_losses = []
-        for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1)):
+        train_losses, val_losses = [], []
+        train_levenshteins, val_levenshteins = [], []
+        for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
             for image, captions in tqdm(dataloader, position=0, leave=True):
-                #imageTensor, captions = imageTensor.to(device), captions.to(device)
                 image, captions = image.to(device), captions.to(device)
 
                 optimizer.zero_grad()
@@ -77,28 +77,38 @@ class EncoderDecoderTrainer:
                 
                 if (iteration + 1) % print_every == 0:
                     model.eval()
-                    train_loss = self._evaluate_model(self.vocab, model, train_df)
+                    print(f'Training set evaluation:')
+                    train_loss, train_levenshtein = self._evaluate_model(model, train_df)
                     train_losses.append(train_loss)
-                    val_loss = self._evaluate_model(self.vocab, model, validation_df)
+                    train_levenshteins.append(train_levenshtein)
+
+                    print(f'Validation set evaluation:')
+                    val_loss, val_levenshtein = self._evaluate_model(model, validation_df)
                     val_losses.append(val_loss)
+                    val_levenshteins.append(val_levenshtein)
                     model.train()
 
                     print(f'Train loss: {train_loss}')
+                    print(f'Train levenshtein: {train_levenshtein}')
                     print(f'Validation loss: {val_loss}')
+                    print(f'Validation levenshtein: {val_levenshtein}')
                 
                 iteration += 1
                     
             self.save_model(model, epoch)
         
-    def _evaluate_model(self, vocab: Vocabulary, model, dataframe):
+    def _evaluate_model(self, model, dataframe):
+        vocab = self.vocab
         vocab_size = len(vocab)
+
+        verbose = True
         losses = []
+        levenshteins = []
         with torch.no_grad():
             loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
-            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=4, shuffle=False)
+            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=4)
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
-                #imageTensor, captions = imageTensor.to(device), captions.to(device)
                 image, captions = image.to(device), captions.to(device)
                 outputs, _ = model(image, captions)
                 targets = captions[:, 1:]
@@ -106,21 +116,48 @@ class EncoderDecoderTrainer:
                 loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
                 losses.append(loss.detach().item())
 
-            dataiter = iter(dataloader)
-            img, original_captions  = next(dataiter)
-            features = model.encoder(img[0:1].to(device))
-            caps, _ = model.decoder.generate_caption(features, vocab=self.vocab)
-            caption = ''.join(caps)
+                predicted_word_idx_list = model.decoder.generate_caption_from_predictions(outputs, vocab)
+                batch_levenshtein = self._calc_batch_levenshtein(predicted_word_idx_list, targets, verbose)
+                levenshteins.append(batch_levenshtein) 
+
+                verbose = False
+
+            return np.mean(losses), np.mean(levenshteins)
+
+    def _calc_batch_levenshtein(self, predicted_word_idx, targets, verbose=False):
+        predicted_word_idx = list(predicted_word_idx.cpu().numpy())
+        targets = list(targets.cpu().numpy())
+
+        distances = []
+        for index, predicted_sentence_word_idx in enumerate(predicted_word_idx):
+            sentence_to_str = self._word_idx_to_caption_sentence(predicted_sentence_word_idx)
+            target_sentence = self._word_idx_to_caption_sentence(targets[index])
+            levenshtein_metric = levenshtein_distance(target_sentence, sentence_to_str)
+            distances.append(levenshtein_metric)
             
-            original_caption = [self.vocab.itos[token_id] for token_id in original_captions[0].numpy()[1:] if self.vocab.itos[token_id] != '<PAD>']
-            original_caption = ''.join(original_caption)
-            print(f'Original caption: {original_caption}')
-            print(f'Generated caption: {caption}')
+            if verbose:
+                print(f'\nPredicted: {sentence_to_str}')
+                print(f'Target: {target_sentence}')
+                print(f'Levenshtein distance: {levenshtein_metric}\n')
+                verbose = False
 
-            levenshtein_metric = levenshtein_distance(original_caption, caption)
-            print(f'Levenshtein distance: {levenshtein_metric}')
+        return np.mean(distances)
 
-            return np.mean(losses)
+    def _word_idx_to_caption_sentence(self, word_idx_list):
+        vocab = self.vocab
+        pad_idx = vocab.stoi['<PAD>']
+        eos_idx = vocab.stoi['<EOS>']
+        
+        words = []
+        for word_idx in word_idx_list:
+            if word_idx == pad_idx:
+                continue
+            
+            words.append(vocab.itos[word_idx])
+            if word_idx == eos_idx:
+                break
+
+        return ''.join(words)
 
     def _split_train_val_test(self, dataframe):
         train=dataframe.sample(frac=0.7,random_state=11) #random state is a seed value
