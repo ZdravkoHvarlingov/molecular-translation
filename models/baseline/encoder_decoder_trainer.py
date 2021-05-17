@@ -115,7 +115,7 @@ class EncoderDecoderTrainer:
             loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
             dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=4)
             
-            for image, captions in tqdm(dataloader):
+            for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
                 outputs, _ = model(image, captions)
                 targets = captions[:, 1:]
@@ -193,27 +193,16 @@ class EncoderDecoderTrainer:
     def _plot_metrics(self, train_losses, train_levenshteins, val_losses, val_levenshteins):
         print("Plotting metrics!")
         
-        plt.plot(train_losses)
-        plt.ylim([0, 3])
-        plt.title("Train Loss")
-        plt.savefig('Train Loss.png')
-        plt.clf()
-
-        plt.plot(train_levenshteins)
-        plt.ylim([0, 160])
-        plt.title("Train Levenshtein")
-        plt.savefig('Train Levenshtein.png')
-        plt.clf()
-
-        plt.plot(val_losses)
-        plt.ylim([0, 3])
-        plt.title("Validation Loss")
-        plt.savefig('Validation Loss.png')
+        plt.title("Train/Validation Loss")
+        plt.plot(train_losses, label="train")
+        plt.plot(val_losses, label="validation")
+        plt.legend()
+        plt.savefig('TrainValidationLoss.png')
         plt.clf()
         
-        plt.plot(val_levenshteins)
-        plt.ylim([0, 160])
-        plt.title("Validation Levenshtein")
-        plt.savefig('Validation Levenshtein.png')
+        plt.title("Train/Validation Levenshtein")
+        plt.plot(train_levenshteins, label="train")
+        plt.plot(val_levenshteins, label="validation")
+        plt.legend()
+        plt.savefig('TrainValidationLevenshtein.png')
         plt.clf()
-    
