@@ -74,7 +74,7 @@ def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffl
 
     return dataloader
 
-def retrieve_evaluate_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True):
+def retrieve_evaluate_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=False):
     pad_idx = vocab.stoi['<PAD>']
     transform = Compose([
         Resize((256,256)),
