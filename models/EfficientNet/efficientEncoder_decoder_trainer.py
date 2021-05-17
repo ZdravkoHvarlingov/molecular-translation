@@ -70,7 +70,6 @@ class EfficientEncoderDecoderTrainer:
             print("Training! ")
             for i, (image, captions) in enumerate(dataloader):
                 image, captions = image.to(device), captions.to(device)
-                print("Batch: ", i)
 
                 optimizer.zero_grad()
                 
@@ -99,7 +98,12 @@ class EfficientEncoderDecoderTrainer:
             # print(f'Validation levenshtein: {val_levenshtein}')
                 
                 
-            if plot_metrics and len(train_losses) and len(train_levenshteins) and len(val_losses) and len(val_levenshteins):
+            if plot_metrics:
+                assert train_losses
+                assert train_levenshteins
+                assert val_losses
+                assert val_levenshteins
+
                 import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
                 self._plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
