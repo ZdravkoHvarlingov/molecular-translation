@@ -188,7 +188,7 @@ class EncoderDecoderTrainer:
         
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
-        torch.save(model_state,f'saved_models/attention_model_state_epoch.pth')
+        torch.save(model_state, f'saved_models/attention_model_state_epoch_{num_epochs}.pth')
 
     def _plot_metrics(self, train_losses, train_levenshteins, val_losses, val_levenshteins):
         print("Plotting metrics!")
