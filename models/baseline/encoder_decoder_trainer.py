@@ -68,7 +68,6 @@ class EncoderDecoderTrainer:
             print("Training! ")
             for i, (image, captions) in enumerate(dataloader):
                 image, captions = image.to(device), captions.to(device)
-                print("Batch: ", i)
 
                 optimizer.zero_grad()
                 
@@ -91,12 +90,6 @@ class EncoderDecoderTrainer:
             val_levenshteins.append(val_levenshtein)
             model.train()
 
-            # print(f'Train loss: {train_loss}')
-            # print(f'Train levenshtein: {train_levenshtein}')
-            # print(f'Validation loss: {val_loss}')
-            # print(f'Validation levenshtein: {val_levenshtein}')
-                
-                
             if plot_metrics and len(train_losses) and len(train_levenshteins) and len(val_losses) and len(val_levenshteins):
                 import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
