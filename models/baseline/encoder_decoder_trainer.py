@@ -53,7 +53,7 @@ class EncoderDecoderTrainer:
 
     def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
         train_df, validation_df, test_df = self._split_train_val_test(dataframe)
-        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=4)
+        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=self.batch_size)
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
         optimizer = optim.Adam(model.parameters(), lr = 3e-4)
@@ -97,7 +97,7 @@ class EncoderDecoderTrainer:
             # print(f'Validation levenshtein: {val_levenshtein}')
                 
                 
-            if plot_metrics & len(train_losses) & len(train_levenshteins) & len(val_losses) & len(val_levenshteins):
+            if plot_metrics and len(train_losses) and len(train_levenshteins) and len(val_losses) and len(val_levenshteins):
                 import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
                 self._plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
@@ -113,7 +113,7 @@ class EncoderDecoderTrainer:
         levenshteins = []
         with torch.no_grad():
             loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
-            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=4)
+            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size)
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
@@ -188,7 +188,7 @@ class EncoderDecoderTrainer:
         
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
-        torch.save(model_state,f'saved_models/attention_model_state_epoch_{num_epochs}.pth')
+        torch.save(model_state,f'saved_models/attention_model_state_epoch.pth')
 
     def _plot_metrics(self, train_losses, train_levenshteins, val_losses, val_levenshteins):
         print("Plotting metrics!")
