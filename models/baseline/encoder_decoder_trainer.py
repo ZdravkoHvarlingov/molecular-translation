@@ -63,7 +63,7 @@ class EncoderDecoderTrainer:
         train_levenshteins, val_levenshteins = [], []
 
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
-            print("Epoch: ", epoch)
+            print("\n Epoch: ", epoch)
 
             print("Training! ")
             for i, (image, captions) in enumerate(dataloader):
