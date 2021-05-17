@@ -53,7 +53,7 @@ class EncoderDecoderTrainer:
 
     def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
         train_df, validation_df, test_df = self._split_train_val_test(dataframe)
-        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=4)
+        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=self.batch_size)
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
         optimizer = optim.Adam(model.parameters(), lr = 3e-4)
@@ -68,7 +68,6 @@ class EncoderDecoderTrainer:
             print("Training! ")
             for i, (image, captions) in enumerate(dataloader):
                 image, captions = image.to(device), captions.to(device)
-                print("Batch: ", i)
 
                 optimizer.zero_grad()
                 
@@ -97,7 +96,12 @@ class EncoderDecoderTrainer:
             # print(f'Validation levenshtein: {val_levenshtein}')
                 
                 
-            if plot_metrics & len(train_losses) & len(train_levenshteins) & len(val_losses) & len(val_levenshteins):
+            if plot_metrics:
+                assert train_losses
+                assert train_levenshteins
+                assert val_losses
+                assert val_levenshteins
+
                 import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
                 self._plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
