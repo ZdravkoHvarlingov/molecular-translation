@@ -17,7 +17,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderDecoderTrainer:
 
-    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=8):
+    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4):
         self.embed_size = embed_size
         self.attention_dim = attention_dim
         self.encoder_dim = encoder_dim
@@ -66,7 +66,7 @@ class EncoderDecoderTrainer:
             print("\n Epoch: ", epoch)
 
             print("Training! ")
-            for i, (image, captions) in enumerate(dataloader):
+            for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
 
                 optimizer.zero_grad()

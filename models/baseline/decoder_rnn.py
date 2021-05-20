@@ -26,7 +26,7 @@ class DecoderRNN(nn.Module):
         
         self.fcn = nn.Linear(decoder_dim, vocab_size)
         self.dropout = nn.Dropout(drop_prob)
-        
+
     def forward(self, features, captions):
          # features shape = [batch_size, 64, 2048]
          # captions shape = [batch_size, max_length]
