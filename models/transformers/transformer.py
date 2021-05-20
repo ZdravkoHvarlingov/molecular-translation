@@ -4,14 +4,14 @@ import math
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5):
+    def __init__(self, ntoken, embed_size, nhead, nhid, nlayers, dropout=0.5):
         super(TransformerModel, self).__init__()
-        self.pos_encoder = PositionalEncoding(ninp, dropout)
-        encoder_layers = nn.TransformerEncoderLayer(ninp, nhead, nhid, dropout)
+        self.pos_encoder = PositionalEncoding(embed_size, dropout)
+        encoder_layers = nn.TransformerEncoderLayer(embed_size, nhead, nhid, dropout)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
-        self.encoder = nn.Embedding(ntoken, ninp)
-        self.ninp = ninp
-        self.decoder = nn.Linear(ninp, ntoken)
+        self.encoder = nn.Embedding(ntoken, embed_size)
+        self.embed_size = embed_size
+        self.decoder = nn.Linear(embed_size, ntoken)
 
         self.init_weights()
 
@@ -27,7 +27,7 @@ class TransformerModel(nn.Module):
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, src, src_mask):
-        src = self.encoder(src) * math.sqrt(self.ninp)
+        src = self.encoder(src) * math.sqrt(self.embed_size)
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_mask)
         output = self.decoder(output)
