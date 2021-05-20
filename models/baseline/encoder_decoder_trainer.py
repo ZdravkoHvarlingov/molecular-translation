@@ -5,7 +5,7 @@ import torch.optim as optim
 
 from common.dataset import retrieve_evaluate_dataloader, retrieve_train_dataloader
 from common.vocabulary import Vocabulary
-from models.baseline.encoder_decoder import EncoderDecoder
+from models.baseline.encoder_decoder import EncoderDecoder, EncoderDecoderTransformer
 from Levenshtein import distance as levenshtein_distance
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -44,6 +44,25 @@ class EncoderDecoderTrainer:
             encoder_dim=self.encoder_dim,
             decoder_dim=self.decoder_dim
         ).to(device)
+
+        model = EncoderDecoderTransformer(
+            ntoken = len(self.vocab),
+            embed_size=self.embed_size,
+            nhead = 2, 
+            nhid = 200, 
+            nlayers = 2, 
+            dropout = 0.3
+        ).to(device)
+
+        print(model)
+        
+        # ntokens = len(vocab.stoi) # the size of vocabulary
+        # emsize = 200 # embedding dimension
+        # nhead = 2 # the number of heads in the multiheadattention models
+        # nhid = 200 # the dimension of the feedforward network model in nn.TransformerEncoder
+        # nlayers = 2 # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+        # dropout = 0.2 # the dropout value
+
 
         if saved_params is not None:
             model.load_state_dict(saved_params['state_dict'])
@@ -187,7 +206,7 @@ class EncoderDecoderTrainer:
         
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
-        torch.save(model_state,f'saved_models/attention_model_state_epoch_{num_epochs}.pth')
+        torch.save(model_state,f'saved_models/transformer_model_state_epoch_{num_epochs}.pth')
 
     def _plot_metrics(self, train_losses, train_levenshteins, val_losses, val_levenshteins):
         print("Plotting metrics!")
