@@ -24,7 +24,7 @@ class EncoderDecoder(nn.Module):
         outputs = self.decoder(features, mode, captions)
 
         return outputs
-
+        
     def generate_id_sequence_from_predictions(self, predictions):
         predicted_word_idx = predictions.argmax(dim=2)
 

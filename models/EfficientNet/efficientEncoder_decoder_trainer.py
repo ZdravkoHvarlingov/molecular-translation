@@ -68,7 +68,7 @@ class EfficientEncoderDecoderTrainer:
             print("\n Epoch: ", epoch)
 
             print("Training! ")
-            for i, (image, captions) in enumerate(dataloader):
+            for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
 
                 optimizer.zero_grad()
@@ -91,11 +91,6 @@ class EfficientEncoderDecoderTrainer:
             val_losses.append(val_loss)
             val_levenshteins.append(val_levenshtein)
             model.train()
-
-            # print(f'Train loss: {train_loss}')
-            # print(f'Train levenshtein: {train_levenshtein}')
-            # print(f'Validation loss: {val_loss}')
-            # print(f'Validation levenshtein: {val_levenshtein}')
                 
                 
             if plot_metrics:
