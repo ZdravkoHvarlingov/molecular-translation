@@ -27,6 +27,7 @@ class EncoderDecoderTransformer(nn.Module):
         super().__init__()
         self.encoder = EncoderCNN(linear_dim = embed_size, transformer=True)
         self.decoder = TransformerModel(
+            encoder = self.encoder,
             ntoken = ntoken, 
             embed_size = embed_size, 
             nhead = nhead, 
@@ -35,8 +36,8 @@ class EncoderDecoderTransformer(nn.Module):
             dropout = dropout
         )
         
-    def forward(self, images, captions):
-        features = self.encoder(images)
-        outputs = self.decoder(features, captions)
+    def forward(self, images):
+        # features = self.encoder(images)
+        outputs = self.decoder(images)
         
         return outputs
