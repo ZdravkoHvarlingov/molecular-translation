@@ -1,3 +1,4 @@
+from math import pi
 import torch
 import torch.nn as nn
 import numpy as np
@@ -37,13 +38,13 @@ class EncoderDecoderTrainer:
             self.decoder_dim = saved_params['decoder_dim']
             trained_epochs = saved_params['num_epochs']
 
-        model = EncoderDecoder(
-            embed_size=self.embed_size,
-            vocab_size=len(self.vocab),
-            attention_dim=self.attention_dim,
-            encoder_dim=self.encoder_dim,
-            decoder_dim=self.decoder_dim
-        ).to(device)
+        # model = EncoderDecoder(
+        #     embed_size=self.embed_size,
+        #     vocab_size=len(self.vocab),
+        #     attention_dim=self.attention_dim,
+        #     encoder_dim=self.encoder_dim,
+        #     decoder_dim=self.decoder_dim
+        # ).to(device)
 
         model = EncoderDecoderTransformer(
             ntoken = len(self.vocab),
@@ -55,7 +56,8 @@ class EncoderDecoderTrainer:
         ).to(device)
 
         print(model)
-        
+        print(len(self.vocab))
+
         # ntokens = len(vocab.stoi) # the size of vocabulary
         # emsize = 200 # embedding dimension
         # nhead = 2 # the number of heads in the multiheadattention models
@@ -81,17 +83,23 @@ class EncoderDecoderTrainer:
         train_losses, val_losses = [], []
         train_levenshteins, val_levenshteins = [], []
 
+        # src_mask = model.decoder.generate_square_subsequent_mask(4).to(device)
+
+
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
             print("\n Epoch: ", epoch)
 
             print("Training! ")
             for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
-
+                
                 optimizer.zero_grad()
                 
-                outputs, _ = model(image, captions)
+                outputs = model(image)
                 targets = captions[:, 1:]
+                
+                print("Outputs shape is: ", outputs.shape)
+                print("Target shape is: ", targets.shape)
                 
                 loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
                 loss.backward()
