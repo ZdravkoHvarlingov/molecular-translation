@@ -4,12 +4,12 @@ import math
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken, embed_size, nhead, nhid, nlayers, dropout=0.5):
+    def __init__(self, encoder, ntoken, embed_size, nhead, nhid, nlayers, dropout=0.5):
         super(TransformerModel, self).__init__()
         self.pos_encoder = PositionalEncoding(embed_size, dropout)
         encoder_layers = nn.TransformerEncoderLayer(embed_size, nhead, nhid, dropout)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
-        self.encoder = nn.Embedding(ntoken, embed_size)
+        self.encoder = encoder
         self.embed_size = embed_size
         self.decoder = nn.Linear(embed_size, ntoken)
 
@@ -22,19 +22,28 @@ class TransformerModel(nn.Module):
 
     def init_weights(self):
         initrange = 0.1
-        self.encoder.weight.data.uniform_(-initrange, initrange)
+
+        # We already have the pretrained model, so no need to initialize weights!
+        # self.encoder.weight.data.uniform_(-initrange, initrange)
+
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, src, src_mask):
+    def forward(self, src):
+        # print(src_mask)
+        # print("the shape of src_mask is: ", src_mask.shape)
         src = self.encoder(src) * math.sqrt(self.embed_size)
+        print("This is the shape of the encoded image: ",src.shape)
         src = self.pos_encoder(src)
-        output = self.transformer_encoder(src, src_mask)
+        
+        print("The encoded image has been encoded!: ",src.shape)
+        output = self.transformer_encoder(src)
         output = self.decoder(output)
         return output
 
     # def generate_caption(self):
         # return
+
 
 class PositionalEncoding(nn.Module):
 
