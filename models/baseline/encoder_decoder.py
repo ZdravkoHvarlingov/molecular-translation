@@ -37,7 +37,6 @@ class EncoderDecoderTransformer(nn.Module):
         )
         
     def forward(self, images):
-        # features = self.encoder(images)
         outputs = self.decoder(images)
         
         return outputs
