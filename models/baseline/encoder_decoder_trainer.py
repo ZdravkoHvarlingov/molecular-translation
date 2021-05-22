@@ -18,7 +18,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderDecoderTrainer:
 
-    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4):
+    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4, transformer=False):
         self.embed_size = embed_size
         self.attention_dim = attention_dim
         self.encoder_dim = encoder_dim
@@ -26,7 +26,7 @@ class EncoderDecoderTrainer:
         self.batch_size = batch_size
         self.vocab = Vocabulary()
     
-    def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False):
+    def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False, transformer=False):
         torch.cuda.empty_cache()
         saved_params = None
         trained_epochs = 0
@@ -38,25 +38,31 @@ class EncoderDecoderTrainer:
             self.decoder_dim = saved_params['decoder_dim']
             trained_epochs = saved_params['num_epochs']
 
-        # model = EncoderDecoder(
-        #     embed_size=self.embed_size,
-        #     vocab_size=len(self.vocab),
-        #     attention_dim=self.attention_dim,
-        #     encoder_dim=self.encoder_dim,
-        #     decoder_dim=self.decoder_dim
-        # ).to(device)
+        
+        if transformer:
+            print("Using Transformer model!")
+            model = EncoderDecoderTransformer(
+                ntoken = len(self.vocab),
+                embed_size=self.embed_size,
+                nhead = 2, 
+                nhid = 200, 
+                nlayers = 2, 
+                dropout = 0.3
+            ).to(device)
 
-        model = EncoderDecoderTransformer(
-            ntoken = len(self.vocab),
+        else:
+            print("using Bahdanau Attention model!")
+            model = EncoderDecoder(
             embed_size=self.embed_size,
-            nhead = 2, 
-            nhid = 200, 
-            nlayers = 2, 
-            dropout = 0.3
+            vocab_size=len(self.vocab),
+            attention_dim=self.attention_dim,
+            encoder_dim=self.encoder_dim,
+            decoder_dim=self.decoder_dim,
+            transformer=transformer,
         ).to(device)
 
-        print(model)
-        print(len(self.vocab))
+        # print(model)
+        # print(len(self.vocab))
 
         # ntokens = len(vocab.stoi) # the size of vocabulary
         # emsize = 200 # embedding dimension
@@ -95,12 +101,13 @@ class EncoderDecoderTrainer:
                 
                 optimizer.zero_grad()
                 
-                outputs = model(image)
+                outputs = model(image, captions)
                 targets = captions[:, 1:]
                 
-                print("Outputs shape is: ", outputs.shape)
-                print("Target shape is: ", targets.shape)
-                
+                # print("Outputs shape is: ", outputs.shape)
+                # print("Target shape is: ", targets.shape)
+                # print("The shape of the outputs in the loss: ", outputs.view(-1, vocab_size).shape)
+                # print("The shape of the targets in the loss: ",  targets.reshape(-1).shape)
                 loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
                 loss.backward()
                 optimizer.step()
@@ -143,7 +150,7 @@ class EncoderDecoderTrainer:
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
-                outputs, _ = model(image, captions)
+                outputs = model(image, captions)
                 targets = captions[:, 1:]
                 
                 loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
