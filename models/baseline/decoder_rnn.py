@@ -51,10 +51,13 @@ class DecoderRNN(nn.Module):
             
             output = self.fcn(self.dropout(h))
             
+            print("Output has shape: ",output.shape)            
+            print("Preds has shape: ",preds.shape)
+
             preds[:, s] = output
             alphas[:, s] = alpha
-        
-        # print(preds.shape)
+            break
+        print(preds.shape)
         return preds, alphas
     
     def generate_caption_from_predictions(self, predictions, vocab: Vocabulary):

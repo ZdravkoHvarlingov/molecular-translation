@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import math
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class TransformerModel(nn.Module):
 
     def __init__(self, encoder, ntoken, embed_size, nhead, nhid, nlayers, dropout=0.5):
@@ -11,7 +13,9 @@ class TransformerModel(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
         self.encoder = encoder
         self.embed_size = embed_size
+        self.ntoken = ntoken
         self.decoder = nn.Linear(embed_size, ntoken)
+        self.dropout = nn.Dropout(dropout)
 
         self.init_weights()
 
@@ -29,17 +33,37 @@ class TransformerModel(nn.Module):
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, src):
+    def forward(self, src, captions):
         # print(src_mask)
-        # print("the shape of src_mask is: ", src_mask.shape)
+        # print("the shape of the image is: ", src.shape)
         src = self.encoder(src) * math.sqrt(self.embed_size)
-        print("This is the shape of the encoded image: ",src.shape)
+        # print("This is the shape of the encoded image: ",src.shape)
         src = self.pos_encoder(src)
+        # print("The encoded image has been encoded with positional encoding!: ",src.shape)
         
-        print("The encoded image has been encoded!: ",src.shape)
         output = self.transformer_encoder(src)
-        output = self.decoder(output)
-        return output
+
+        seq_length = len(captions[0])-1
+        batch_size = captions.size(0)
+
+        outputs = torch.zeros(batch_size, seq_length, self.ntoken).to(device)
+        
+        for s in range(seq_length):
+            
+            
+            decoded_output = self.decoder(self.dropout(output))
+
+            # print("Decoder output: ",decoded_output[:,0,:].shape)
+            # print("Preds shape: ",outputs.shape)            
+            # print(outputs[:, s].shape)
+
+            # Output has shape:  torch.Size([4, 42])                                                                                                                                                                               | 0/875 [00:00<?, ?it/s] 
+            # Preds has shape:  torch.Size([4, 179, 42])
+
+            outputs[:, s] = decoded_output[:,0,:]
+
+
+        return outputs
 
     # def generate_caption(self):
         # return

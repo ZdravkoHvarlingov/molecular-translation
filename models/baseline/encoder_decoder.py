@@ -5,9 +5,9 @@ from models.baseline.decoder_rnn import DecoderRNN
 from models.transformers.transformer import TransformerModel
 
 class EncoderDecoder(nn.Module):
-    def __init__(self, embed_size, vocab_size, attention_dim, encoder_dim, decoder_dim, drop_prob=0.3):
+    def __init__(self, embed_size, vocab_size, attention_dim, encoder_dim, decoder_dim, transformer = False, drop_prob=0.3):
         super().__init__()
-        self.encoder = EncoderCNN(linear_dim = embed_size, transformer=False)
+        self.encoder = EncoderCNN(linear_dim = embed_size, transformer=transformer)
         self.decoder = DecoderRNN(
             embed_size=embed_size,
             vocab_size=vocab_size,
@@ -19,13 +19,12 @@ class EncoderDecoder(nn.Module):
     def forward(self, images, captions):
         features = self.encoder(images)
         outputs = self.decoder(features, captions)
-        
         return outputs
 
 class EncoderDecoderTransformer(nn.Module):
-    def __init__(self, ntoken, embed_size, nhead, nhid, nlayers, dropout=0.3):
+    def __init__(self, ntoken, embed_size, nhead, nhid, nlayers, transformer = True, dropout=0.3):
         super().__init__()
-        self.encoder = EncoderCNN(linear_dim = embed_size, transformer=True)
+        self.encoder = EncoderCNN(linear_dim = embed_size, transformer=transformer)
         self.decoder = TransformerModel(
             encoder = self.encoder,
             ntoken = ntoken, 
@@ -36,7 +35,7 @@ class EncoderDecoderTransformer(nn.Module):
             dropout = dropout
         )
         
-    def forward(self, images):
-        outputs = self.decoder(images)
+    def forward(self, images, captions):
+        outputs = self.decoder(images, captions)
         
         return outputs
