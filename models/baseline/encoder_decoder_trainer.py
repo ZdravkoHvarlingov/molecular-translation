@@ -61,8 +61,7 @@ class EncoderDecoderTrainer:
             transformer=transformer,
         ).to(device)
 
-        # print(model)
-        # print(len(self.vocab))
+        print(len(self.vocab))
 
         # ntokens = len(vocab.stoi) # the size of vocabulary
         # emsize = 200 # embedding dimension
@@ -103,12 +102,8 @@ class EncoderDecoderTrainer:
                 
                 outputs = model(image, captions)
                 targets = captions[:, 1:]
-                
-                # print("Outputs shape is: ", outputs.shape)
-                # print("Target shape is: ", targets.shape)
-                # print("The shape of the outputs in the loss: ", outputs.view(-1, vocab_size).shape)
-                # print("The shape of the targets in the loss: ",  targets.reshape(-1).shape)
-                loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
+
+                loss = loss_func(outputs.contiguous().view(-1, vocab_size), targets.reshape(-1))
                 loss.backward()
                 optimizer.step()
 
@@ -152,8 +147,9 @@ class EncoderDecoderTrainer:
                 image, captions = image.to(device), captions.to(device)
                 outputs = model(image, captions)
                 targets = captions[:, 1:]
+
+                loss = loss_func(outputs.contiguous().view(-1, vocab_size), targets.reshape(-1))
                 
-                loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
                 losses.append(loss.detach().item())
 
                 predicted_word_idx_list = model.decoder.generate_caption_from_predictions(outputs, vocab)

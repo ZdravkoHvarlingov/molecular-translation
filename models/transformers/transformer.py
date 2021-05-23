@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import math
+
+from torch.nn.modules import linear
 from common.vocabulary import Vocabulary
 
 
@@ -10,13 +12,23 @@ class TransformerModel(nn.Module):
 
     def __init__(self, encoder, ntoken, embed_size, nhead, nhid, nlayers, dropout=0.5):
         super(TransformerModel, self).__init__()
+
+        # encoder
+        self.encoder = encoder
         self.pos_encoder = PositionalEncoding(embed_size, dropout)
         encoder_layers = nn.TransformerEncoderLayer(embed_size, nhead, nhid, dropout)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
-        self.encoder = encoder
+
+        # decoder
+        decoder_layers = nn.TransformerDecoderLayer(ntoken, nhead, nhid, dropout)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layers, nlayers)
+        self.embedding = nn.Embedding(ntoken, embed_size)
+
+
         self.embed_size = embed_size
         self.ntoken = ntoken
-        self.decoder = nn.Linear(embed_size, ntoken)
+
+        self.linear = nn.Linear(embed_size, ntoken)
         self.dropout = nn.Dropout(dropout)
 
         self.init_weights()
@@ -32,32 +44,23 @@ class TransformerModel(nn.Module):
         # We already have the pretrained model, so no need to initialize weights!
         # self.encoder.weight.data.uniform_(-initrange, initrange)
 
-        self.decoder.bias.data.zero_()
-        self.decoder.weight.data.uniform_(-initrange, initrange)
+        self.linear.bias.data.zero_()
+        self.linear.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, src, captions):
-        # print(src_mask)
-        # print("the shape of the image is: ", src.shape)
+        embedded_caption = self.embedding(captions) 
+        embedded_caption = self.linear(embedded_caption) 
+
         src = self.encoder(src) * math.sqrt(self.embed_size)
-        # print("This is the shape of the encoded image: ",src.shape)
         src = self.pos_encoder(src)
-        # print("The encoded image has been encoded with positional encoding!: ",src.shape)
-        
-        output = self.transformer_encoder(src)
-
-        seq_length = len(captions[0])-1
-        batch_size = captions.size(0)
-
-        outputs = torch.zeros(batch_size, seq_length, self.ntoken).to(device)
-        
-        for s in range(seq_length):
-            
-            
-            decoded_output = self.decoder(self.dropout(output))
+        encoded_image = self.transformer_encoder(src)     
+        encoded_image = self.linear(encoded_image)        
 
 
-            outputs[:, s] = decoded_output[:,0,:]
+        outputs = self.transformer_decoder(torch.swapaxes(embedded_caption, 0,1), torch.swapaxes(encoded_image, 0,1))
 
+        # [batch_size, seq_length, ntoken]
+        outputs = torch.swapaxes(outputs,0,1)[:,1:,:]
 
         return outputs
 
