@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import math
+from common.vocabulary import Vocabulary
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -53,20 +55,16 @@ class TransformerModel(nn.Module):
             
             decoded_output = self.decoder(self.dropout(output))
 
-            # print("Decoder output: ",decoded_output[:,0,:].shape)
-            # print("Preds shape: ",outputs.shape)            
-            # print(outputs[:, s].shape)
-
-            # Output has shape:  torch.Size([4, 42])                                                                                                                                                                               | 0/875 [00:00<?, ?it/s] 
-            # Preds has shape:  torch.Size([4, 179, 42])
 
             outputs[:, s] = decoded_output[:,0,:]
 
 
         return outputs
 
-    # def generate_caption(self):
-        # return
+    def generate_caption_from_predictions(self, predictions, vocab: Vocabulary):
+        predicted_word_idx = predictions.argmax(dim=2)
+
+        return predicted_word_idx
 
 
 class PositionalEncoding(nn.Module):
