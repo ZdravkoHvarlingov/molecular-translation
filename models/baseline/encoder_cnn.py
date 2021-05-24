@@ -1,10 +1,9 @@
 import torch.nn as nn
-from torch.nn.modules import transformer
 import torchvision.models as models
 
 
 class EncoderCNN(nn.Module):
-    def __init__(self, linear_dim, transformer = False):
+    def __init__(self, linear_dim):
         super(EncoderCNN, self).__init__()
         resnet = models.resnet50(pretrained=True)
         resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -20,8 +19,5 @@ class EncoderCNN(nn.Module):
         features = features.view(features.size(0), -1, features.size(-1))
 
         # shape = [batch_size, 64, 2048]
-
-        if transformer:
-            features = self.linear(features)
 
         return features

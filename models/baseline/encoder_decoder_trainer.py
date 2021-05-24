@@ -6,7 +6,7 @@ import torch.optim as optim
 
 from common.dataset import retrieve_evaluate_dataloader, retrieve_train_dataloader
 from common.vocabulary import Vocabulary
-from models.baseline.encoder_decoder import EncoderDecoder, EncoderDecoderTransformer
+from models.baseline.encoder_decoder import EncoderDecoder
 from Levenshtein import distance as levenshtein_distance
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderDecoderTrainer:
 
-    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4, transformer=False):
+    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4):
         self.embed_size = embed_size
         self.attention_dim = attention_dim
         self.encoder_dim = encoder_dim
@@ -26,7 +26,7 @@ class EncoderDecoderTrainer:
         self.batch_size = batch_size
         self.vocab = Vocabulary()
     
-    def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False, transformer=False):
+    def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False):
         torch.cuda.empty_cache()
         saved_params = None
         trained_epochs = 0
@@ -39,36 +39,16 @@ class EncoderDecoderTrainer:
             trained_epochs = saved_params['num_epochs']
 
         
-        if transformer:
-            print("Using Transformer model!")
-            model = EncoderDecoderTransformer(
-                ntoken = len(self.vocab),
-                embed_size=self.embed_size,
-                nhead = 2, 
-                nhid = 200, 
-                nlayers = 2, 
-                dropout = 0.3
-            ).to(device)
-
-        else:
-            print("using Bahdanau Attention model!")
-            model = EncoderDecoder(
-            embed_size=self.embed_size,
-            vocab_size=len(self.vocab),
-            attention_dim=self.attention_dim,
-            encoder_dim=self.encoder_dim,
-            decoder_dim=self.decoder_dim,
-            transformer=transformer,
+        print("Using Bahdanau Attention model!")
+        model = EncoderDecoder(
+        embed_size=self.embed_size,
+        vocab_size=len(self.vocab),
+        attention_dim=self.attention_dim,
+        encoder_dim=self.encoder_dim,
+        decoder_dim=self.decoder_dim,
         ).to(device)
 
         print(len(self.vocab))
-
-        # ntokens = len(vocab.stoi) # the size of vocabulary
-        # emsize = 200 # embedding dimension
-        # nhead = 2 # the number of heads in the multiheadattention models
-        # nhid = 200 # the dimension of the feedforward network model in nn.TransformerEncoder
-        # nlayers = 2 # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-        # dropout = 0.2 # the dropout value
 
 
         if saved_params is not None:
@@ -88,7 +68,6 @@ class EncoderDecoderTrainer:
         train_losses, val_losses = [], []
         train_levenshteins, val_levenshteins = [], []
 
-        # src_mask = model.decoder.generate_square_subsequent_mask(4).to(device)
 
 
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
@@ -100,10 +79,10 @@ class EncoderDecoderTrainer:
                 
                 optimizer.zero_grad()
                 
-                outputs = model(image, captions)
+                outputs, alpha = model(image, captions)
                 targets = captions[:, 1:]
 
-                loss = loss_func(outputs.contiguous().view(-1, vocab_size), targets.reshape(-1))
+                loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
                 loss.backward()
                 optimizer.step()
 
@@ -145,7 +124,7 @@ class EncoderDecoderTrainer:
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
-                outputs = model(image, captions)
+                outputs, alpha = model(image, captions)
                 targets = captions[:, 1:]
 
                 loss = loss_func(outputs.contiguous().view(-1, vocab_size), targets.reshape(-1))
