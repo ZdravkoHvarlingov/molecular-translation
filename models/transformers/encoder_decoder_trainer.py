@@ -67,7 +67,7 @@ class EncoderDecoderTrainer:
         self._perform_training(dataframe, model, num_epochs, trained_epochs, plot_metrics)
 
     def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
-        train_df, validation_df, test_df = self._split_train_val_test(dataframe)
+        train_df, validation_df, _ = self._split_train_val_test(dataframe)
         dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=self.batch_size)
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
@@ -82,27 +82,31 @@ class EncoderDecoderTrainer:
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
             print("\n Epoch: ", epoch)
 
+
             print("Training! ")
             for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
                 
                 optimizer.zero_grad()
                 
-                outputs = model(image, captions)
+                outputs = model(image, captions, mode = "train")
                 targets = captions[:, 1:]
-
+                outputs = outputs[:,:,1:]
+                # print("Outputs: ",outputs.shape)
+                # print("Targets: ",targets.shape)
+                # print(targets.reshape(-1).shape)
                 loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
                 loss.backward()
                 optimizer.step()
 
             model.eval()
             print(f'Training set evaluation:')
-            train_loss, train_levenshtein = self._evaluate_model(model, train_df)
+            train_loss, train_levenshtein = self._evaluate_model(model, train_df, mode="eval")
             train_losses.append(train_loss)
             train_levenshteins.append(train_levenshtein)
 
             print(f'Validation set evaluation:')
-            val_loss, val_levenshtein = self._evaluate_model(model, validation_df)
+            val_loss, val_levenshtein = self._evaluate_model(model, validation_df, mode="eval")
             val_losses.append(val_loss)
             val_levenshteins.append(val_levenshtein)
             model.train()
@@ -120,7 +124,7 @@ class EncoderDecoderTrainer:
 
             self._save_model(model, epoch)
         
-    def _evaluate_model(self, model, dataframe):
+    def _evaluate_model(self, model, dataframe, mode):
         vocab = self.vocab
         vocab_size = len(vocab)
 
@@ -130,17 +134,25 @@ class EncoderDecoderTrainer:
         with torch.no_grad():
             loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
             dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size)
-            
+
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
-                outputs = model(image, captions)
+                outputs = model(image, captions, mode=mode)
+                # print("Targets shape: ",captions.shape)
                 targets = captions[:, 1:]
+                # print("Targets shape: ",targets.shape)
+                # print(outputs.type())
+                # print(targets.type())
+                # loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
 
-                loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
-                
+                loss = loss_func(outputs, targets)
+
                 losses.append(loss.detach().item())
-
-                predicted_word_idx_list = model.decoder.generate_caption_from_predictions(outputs, vocab)
+                # losses.append(3) 
+                outputs = outputs[:, 1:]
+                predicted_word_idx_list = outputs
+                
+                # predicted_word_idx_list = model.decoder.generate_caption_from_predictions(outputs, vocab)
                 batch_levenshtein = self._calc_batch_levenshtein(predicted_word_idx_list, targets, verbose)
                 levenshteins.append(batch_levenshtein) 
 
