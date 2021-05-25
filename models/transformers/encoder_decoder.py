@@ -8,7 +8,7 @@ from models.transformers.transformer import TransformerModel
 class EncoderDecoderTransformer(nn.Module):
     def __init__(self, ntoken, embed_size, nhead, nhid, nlayers, dropout=0.3):
         super().__init__()
-        self.encoder = EncoderCNN(linear_dim = embed_size)
+        self.encoder = EncoderCNN()
         self.decoder = TransformerModel(
             encoder = self.encoder,
             ntoken = ntoken, 
@@ -19,7 +19,7 @@ class EncoderDecoderTransformer(nn.Module):
             dropout = dropout
         )
         
-    def forward(self, images, captions):
-        outputs = self.decoder(images, captions)
+    def forward(self, images, captions, mode):
+        outputs = self.decoder(images, captions, mode)
         
         return outputs
