@@ -89,15 +89,22 @@ class EncoderDecoderTrainer:
             for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
 
-                print("captions shape: ",captions.shape)
 
                 optimizer.zero_grad()
                 
                 outputs = model(image, captions, mode = "train")
-                targets = captions[:, 1:]
-                outputs = outputs[:,:,1:]
+                # targets = captions[:, 1:]
+                # outputs = outputs[:,:,1:]
 
-                loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
+                # outputs = [4, 42, x] -> [4x, 42]
+                # captions = [4, x] ->    [4x]
+                # print("Ouptuts shape: ", outputs.shape)
+                # print("captions shape: ", captions.shape)
+
+                loss = loss_func(outputs, captions)
+                # loss = loss_func(outputs.reshape(-1, vocab_size), captions.reshape(-1))
+                
+                print("The loss in the training phase is: ", loss.item())
                 loss.backward()
                 optimizer.step()
 
@@ -114,11 +121,7 @@ class EncoderDecoderTrainer:
             model.train()
                 
                 
-            if plot_metrics:
-                assert train_losses
-                assert train_levenshteins
-                assert val_losses
-                assert val_levenshteins
+            if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
 
                 import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -141,31 +144,19 @@ class EncoderDecoderTrainer:
                 image, captions = image.to(device), captions.to(device)
                 
                 outputs, preds = model(image, captions, mode=mode)
-                # print("Targets shape: ",captions.shape)
+
                 targets = captions[:, 1:]
                 outputs = outputs[:, 1:]
-                preds = preds[:,1:,:]
+                # preds = preds[:,1:,:]
                 # print("Targets shape: ",targets.shape)
                 # print("outputs shape: ",outputs.shape)
                 # print("Preds shape: ",preds.shape)
+                # print("captions shape: ",captions.shape)
 
 
-                # print("Targets shape: ",targets)
-                # print("outputs shape: ",outputs)
-                # print("Preds shape: ",preds)
-
-                # loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
-                # print("reshaped targets: ", targets.reshape(-1).shape)
-                # print("outputs targets: ", outputs.reshape(-1))
-                # reshaped_targets = targets.reshape(-1)
-                # reshaped_outputs = outputs.reshape(-1)
-
-                # print("preds targets: ", preds.reshape(-1, vocab_size).shape)
-                loss = loss_func(preds.reshape(-1, vocab_size).float(), targets.reshape(-1))
-                # loss = loss_func(preds.float(), targets)
+                loss = loss_func(preds.transpose(1,2).float(), captions)
 
                 losses.append(loss.detach().item())
-                # losses.append(3) 
                 outputs = outputs[:, 1:]
                 predicted_word_idx_list = outputs
                 
@@ -174,7 +165,8 @@ class EncoderDecoderTrainer:
                 levenshteins.append(batch_levenshtein) 
 
                 verbose = False            
-
+            print("Mean loss: ", np.mean(losses))
+            print("Mean levensthein: ", np.mean(levenshteins))
             return np.mean(losses), np.mean(levenshteins)
 
     def _calc_batch_levenshtein(self, predicted_word_idx, targets, verbose=False):
