@@ -12,6 +12,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+from time import time
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -68,6 +69,8 @@ class EncoderDecoderTrainer:
 
     def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
         train_df, validation_df, _ = self._split_train_val_test(dataframe)
+
+        
         dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=self.batch_size)
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
@@ -76,8 +79,7 @@ class EncoderDecoderTrainer:
 
         train_losses, val_losses = [], []
         train_levenshteins, val_levenshteins = [], []
-
-
+        
 
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
             print("\n Epoch: ", epoch)
@@ -86,15 +88,15 @@ class EncoderDecoderTrainer:
             print("Training! ")
             for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
-                
+
+                print("captions shape: ",captions.shape)
+
                 optimizer.zero_grad()
                 
                 outputs = model(image, captions, mode = "train")
                 targets = captions[:, 1:]
                 outputs = outputs[:,:,1:]
-                # print("Outputs: ",outputs.shape)
-                # print("Targets: ",targets.shape)
-                # print(targets.reshape(-1).shape)
+
                 loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
                 loss.backward()
                 optimizer.step()
@@ -137,15 +139,30 @@ class EncoderDecoderTrainer:
 
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
-                outputs = model(image, captions, mode=mode)
+                
+                outputs, preds = model(image, captions, mode=mode)
                 # print("Targets shape: ",captions.shape)
                 targets = captions[:, 1:]
+                outputs = outputs[:, 1:]
+                preds = preds[:,1:,:]
                 # print("Targets shape: ",targets.shape)
-                # print(outputs.type())
-                # print(targets.type())
-                # loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
+                # print("outputs shape: ",outputs.shape)
+                # print("Preds shape: ",preds.shape)
 
-                loss = loss_func(outputs, targets)
+
+                # print("Targets shape: ",targets)
+                # print("outputs shape: ",outputs)
+                # print("Preds shape: ",preds)
+
+                # loss = loss_func(outputs.reshape(-1, vocab_size), targets.reshape(-1))
+                # print("reshaped targets: ", targets.reshape(-1).shape)
+                # print("outputs targets: ", outputs.reshape(-1))
+                # reshaped_targets = targets.reshape(-1)
+                # reshaped_outputs = outputs.reshape(-1)
+
+                # print("preds targets: ", preds.reshape(-1, vocab_size).shape)
+                loss = loss_func(preds.reshape(-1, vocab_size).float(), targets.reshape(-1))
+                # loss = loss_func(preds.float(), targets)
 
                 losses.append(loss.detach().item())
                 # losses.append(3) 

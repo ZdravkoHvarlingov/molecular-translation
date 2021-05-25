@@ -1,10 +1,11 @@
+from models.baseline.encoder_decoder import EncoderDecoder
 import torch
 import torch.nn as nn
 import math
 
-from torch.nn.modules import linear
 from common.vocabulary import Vocabulary
-
+import numpy as np
+from time import time
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -33,7 +34,7 @@ class TransformerModel(nn.Module):
         self.predictor = nn.Linear(embed_size, ntoken)
 
 
-        self.linear_2 = nn.Linear(embed_size, ntoken)
+        self.linear_2 = nn.Linear(12800, embed_size)
         self.dropout = nn.Dropout(dropout)
         self.softmax = nn.Softmax(dim=2)
 
@@ -41,7 +42,6 @@ class TransformerModel(nn.Module):
 
     def generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        print("second line")
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
@@ -55,84 +55,94 @@ class TransformerModel(nn.Module):
         self.linear.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, src, captions, mode):
-        # print("captions: ",captions.shape)
-        embedded_caption = self.embedding(captions)  * math.sqrt(self.embed_size)
-        # print("embedded_caption: ",embedded_caption.shape)
-        embedded_caption = self.pos_encoder(embedded_caption)
-        # print("embedded_caption: ",embedded_caption.shape)
-        # embedded_caption = self.linear_2(embedded_caption) 
-        # print("embedded_caption: ",embedded_caption.shape)
+        
+        # captions [4, x] batch_size, seq_length
+
+        embedded_caption = self.embedding(captions)  * math.sqrt(self.embed_size) # [4, x, 200] batch_size, seq_length, embedding dim
+        embedded_caption = self.pos_encoder(embedded_caption) # [4, x, 200] batch_size, seq_length, embedding dim
 
 
-        # print("src: ",src.shape)
-        # print("src: ",src.squeeze().reshape(src.size(0),-1).shape)
-        src = self.encoder(src)
-        # print("src:", src.shape)
-        src = self.linear(src)
-        # print("src: ",src.shape)
-        # src = self.pos_encoder(src)
-        # print("src: ",src.shape)
-        encoded_image = self.transformer_encoder(src)    
-        # print("encoded_image: ",encoded_image.shape) 
-        # encoded_image = self.linear(encoded_image)        
+        # src [4, 1, 256, 256] batch_size, channels, height, width
+        src = self.encoder(src) #  [4, 64, 2048] batch_size, resnet encoding
+        src = self.linear(src) #  [4, 64, 200] batch_size, resnet encoding
+        src = src.reshape(src.size(0),-1) # [4, 12800] batch_size, resnet encoding (flattened)
+        src = self.linear_2(src) # [4, 200] batch_size, resnet encoding (down-scaled)
+        src = src.unsqueeze(dim=0) # [1, 4, 200] seq_length_image, batch_size, resnet encoding (down-scaled)
+        encoded_image = self.transformer_encoder(src) # [1, 4, 200] seq_length_image, batch_size, resnet encoding (down-scaled)
 
         
-        embedded_caption = embedded_caption.transpose(0,1)
-        encoded_image = encoded_image.transpose(0,1)
+        embedded_caption = embedded_caption.transpose(0,1) # [x, 4, 200] seq_length, batch_size, embedding dim
+        encoded_image = encoded_image # [1, 4, 200] seq_length_image, batch_size, resnet encoding (down-scaled)
+
 
         if mode == 'train':
-            # print("The phase is train!!!!!!!!!!!!!!!!")
-            # tgt_mask = self.generate_square_subsequent_mask(embedded_caption.size(0)).to(device).transpose(0,1)
+
             tgt_mask = torch.nn.Transformer().generate_square_subsequent_mask(
-                embedded_caption.size(0)).to(device).transpose(0,1)
-            # print("Embedded caption: ", embedded_caption.shape)
-            # print("tgt_mask tgt_mask: ", tgt_mask.shape)
-            # print("encoded_image : ", encoded_image.shape)
+                embedded_caption.size(0)).to(device).transpose(0,1) # [x , x] seq_length, seq_length
 
-            outputs = self.transformer_decoder(tgt = embedded_caption, tgt_mask = tgt_mask, memory = encoded_image)
-            # print(outputs.shape)
-            # [batch_size, seq_length, ntoken]
-            preds = self.predictor(outputs).permute(1, 2, 0)
-            # print(self.predictor(outputs).shape)
-            # print(self.predictor(outputs).permute(1, 2, 0).shape)
+            outputs = self.transformer_decoder(tgt = embedded_caption, tgt_mask = tgt_mask, memory = encoded_image) # [x, 4, 200]  seq_length, batch_size, embedding dim
 
-            # outputs = outputs.transpose(0,1)[:,1:,:]
-            # print(outputs.shape)
-            # softmax_outputs = self.softmax(outputs)
-            
+            preds = self.predictor(outputs).permute(1, 2, 0) # [4, 42, x]  batch_size, ntoken, seq_length
+
             return preds
 
         elif mode == 'eval':
+            bs = encoded_image.size(1)
+            sos_idx = 1
+            eos_idx = 2
+            output_len = 299
 
+            encoder_output = encoded_image.transpose(0,1)  # (bs, input_len, d_model)
+            
+            # initialized the input of the decoder with sos_idx (start of sentence token idx)
+            output = torch.ones(bs, output_len).long().to(device)*sos_idx
+            preds = torch.ones(bs, output_len, self.ntoken).long().to(device)*sos_idx
+            
+            for t in range(1, output_len):
+ 
+                tgt_emb = self.embedding(output[:, :t]).transpose(0, 1) # [t, 4, 200] t, batch_size, embedding_dim
 
-        # d_model = 768
+                tgt_mask = self.generate_square_subsequent_mask(t).to(device) # [t, t] t, t
+
+                decoder_output = self.transformer_decoder(tgt=tgt_emb,
+                                        memory=encoder_output,
+                                        tgt_mask=tgt_mask) # [t, 4, 200] t, batch_size, embedding_dim
+
+                pred_proba_t = self.predictor(decoder_output)[-1, :, :] # [t, 4, 42] t, batch_size, ntoken -> the slice makes it [4, 42] batch_size, ntoken
+
+                output_t = pred_proba_t.data.topk(1)[1].squeeze() # [4] batch_size 
+
+                output[:, t] = output_t # [4, t] batch_size, t
+
+                preds[:,t] = pred_proba_t # [4, t, 42] batch_size, t, ntoken
+                
+            #output (bs, output_len)
+            #preds (bs, output_len, ntoken)
+            return output, preds
+
+        elif mode == 'inference':
+
             bs = embedded_caption.size(1)
             sos_idx = 1
-        # vocab_size = 10000
-        # input_len = encoded_image.size(0)
+            eos_idx = 2
             output_len = embedded_caption.size(0)
-
-        # Define the model
-        # encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=4).to(device)
-        # encoder = nn.TransformerEncoder(encoder_layer=encoder_layer,
-        #                                 num_layers=6).to(device)
-        # decoder_layer = nn.TransformerDecoderLayer(d_model=d_model, nhead=4).to(device)
-        # decoder = nn.TransformerDecoder(decoder_layer=decoder_layer,
-        #                                 num_layers=6).to(device)
-
-        # decoder_emb = nn.Embedding(vocab_size, d_model)
-        # predictor = nn.Linear(d_model, vocab_size)
 
         # for a single batch x
             encoder_output = encoded_image.transpose(0,1)  # (bs, input_len, d_model)
             
             # initialized the input of the decoder with sos_idx (start of sentence token idx)
             output = torch.ones(bs, output_len).long().to(device)*sos_idx
+            preds = torch.ones(bs, output_len, self.ntoken).long().to(device)*sos_idx
+            
             # print("The output of the encoder: ",encoder_output.shape)
             # print("Input to the decoder: ",output.shape)
             # print("The output length is: ", output_len)
+            print("Creating the predictions!")
             for t in range(1, output_len):
                 # print(t)
+                # print(preds[:, :t, :])
+                # print(output[:, :t])
+
                 tgt_emb = self.embedding(output[:, :t]).transpose(0, 1)
                 # print("tgt_emb: ", tgt_emb.shape)
 
@@ -141,18 +151,31 @@ class TransformerModel(nn.Module):
                 # print("tgt_mask_2: ", tgt_mask_2.shape)
                 # tgt_mask =  self.generate_square_subsequent_mask(t).to(device).transpose(0,1)
                 # print("tgt_mask: ", tgt_mask.shape)
+                # print("encoder_output: ", encoder_output.shape)
                 decoder_output = self.transformer_decoder(tgt=tgt_emb,
                                         memory=encoder_output,
                                         tgt_mask=tgt_mask)
                 # print("decoder_output: ", decoder_output.shape)
-                pred_proba_t = decoder_output[-1, :, :]
+                pred_proba_t = self.predictor(decoder_output)[-1, :, :]
+                # print("pred_proba_t: ", self.predictor(decoder_output).shape)
                 # print("pred_proba_t: ", pred_proba_t.shape)
                 output_t = pred_proba_t.data.topk(1)[1].squeeze()
-                # print("output_t: ", pred_proba_t.data.topk(1))
+                # print("output_t: ", output_t.shape)
+                # print(output.shape)
+                
                 output[:, t] = output_t
+                
+                # print("output slice: ",output[:,t].shape)
+                # print("preds slice: ",preds[:,t].shape)
+                # preds[:, t, :] = [output_t, pred_proba_t[0,:]]
+                preds[:,t] = pred_proba_t
+                
+                # print("Top 1: ", pred_proba_t.data.topk(1))
+                # print("Top 1 [1]: ", pred_proba_t.data.topk(1)[1].shape)
+
                 # print(output)
             #output (bs, output_len)
-            return output
+            return output, preds
 
     def generate_caption_from_predictions(self, predictions, vocab: Vocabulary):
         predicted_word_idx = predictions.argmax(dim=2)
