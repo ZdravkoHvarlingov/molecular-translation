@@ -1,3 +1,4 @@
+from matplotlib.pyplot import xcorr
 from models.baseline.encoder_decoder import EncoderDecoder
 import torch
 import torch.nn as nn
@@ -54,6 +55,7 @@ class TransformerModel(nn.Module):
         self.linear.bias.data.zero_()
         self.linear.weight.data.uniform_(-initrange, initrange)
 
+
     def forward(self, src, captions, mode):
         
         # captions [4, x] batch_size, seq_length
@@ -70,18 +72,29 @@ class TransformerModel(nn.Module):
         src = src.unsqueeze(dim=0) # [1, 4, 200] seq_length_image, batch_size, resnet encoding (down-scaled)
         encoded_image = self.transformer_encoder(src) # [1, 4, 200] seq_length_image, batch_size, resnet encoding (down-scaled)
 
+        # src = src.transpose(0,1) #  [64, 4, 200] batch_size, resnet encoding
+        # encoded_image = self.transformer_encoder(src) # [64, 4, 200] seq_length_image, batch_size, resnet encoding (down-scaled)
+
+
         
         embedded_caption = embedded_caption.transpose(0,1) # [x, 4, 200] seq_length, batch_size, embedding dim
-        encoded_image = encoded_image # [1, 4, 200] seq_length_image, batch_size, resnet encoding (down-scaled)
 
+        # SOS, A, B
+        # [True, False, False] -> SOS -> A
+        # [True, True, False] -> SOS, A -> B
+        # [True, True, True] -> SOS, A, B 
 
         if mode == 'train':
 
-            tgt_mask = torch.nn.Transformer().generate_square_subsequent_mask(
-                embedded_caption.size(0)).to(device).transpose(0,1) # [x , x] seq_length, seq_length
-
+            tgt_mask = self.generate_square_subsequent_mask(embedded_caption.size(0)).to(device).transpose(0,1) # [x , x] seq_length, seq_length
+            # print("Captions: ", embedded_caption.shape)
+            # print("Images: ", encoded_image.shape)
             outputs = self.transformer_decoder(tgt = embedded_caption, tgt_mask = tgt_mask, memory = encoded_image) # [x, 4, 200]  seq_length, batch_size, embedding dim
+            # print("Training!!!!!!!!!!!!!!!!!!!")
+            # print("Decoder output shape", outputs.shape)
+            # print("Decoder output: ",outputs)
 
+            # x 4 42
             preds = self.predictor(outputs).permute(1, 2, 0) # [4, 42, x]  batch_size, ntoken, seq_length
 
             return preds
@@ -90,32 +103,46 @@ class TransformerModel(nn.Module):
             bs = encoded_image.size(1)
             sos_idx = 1
             eos_idx = 2
-            output_len = 299
+            output_len = embedded_caption.size(0)
 
             encoder_output = encoded_image.transpose(0,1)  # (bs, input_len, d_model)
             
             # initialized the input of the decoder with sos_idx (start of sentence token idx)
-            output = torch.ones(bs, output_len).long().to(device)*sos_idx
-            preds = torch.ones(bs, output_len, self.ntoken).long().to(device)*sos_idx
+            output = torch.ones(bs, output_len).long().to(device) * sos_idx
+            preds = torch.ones(bs, output_len, self.ntoken).long().to(device) * sos_idx
             
+            print("Output!!!!!!!!!!!!!!!!!!!!!! ",output)
             for t in range(1, output_len):
  
                 tgt_emb = self.embedding(output[:, :t]).transpose(0, 1) # [t, 4, 200] t, batch_size, embedding_dim
 
-                tgt_mask = self.generate_square_subsequent_mask(t).to(device) # [t, t] t, t
+                tgt_mask = self.generate_square_subsequent_mask(t).to(device).transpose(0,1) # [t, t] t, t
 
                 decoder_output = self.transformer_decoder(tgt=tgt_emb,
                                         memory=encoder_output,
                                         tgt_mask=tgt_mask) # [t, 4, 200] t, batch_size, embedding_dim
 
-                pred_proba_t = self.predictor(decoder_output)[-1, :, :] # [t, 4, 42] t, batch_size, ntoken -> the slice makes it [4, 42] batch_size, ntoken
+                print("Decoder output shape", decoder_output.shape)
+                print("Decoder output: ",decoder_output)
 
+                pred_proba_t = self.predictor(decoder_output)[-1, :, :] # [t, 4, 42] t, batch_size, ntoken -> the slice makes it [4, 42] batch_size, ntoken
+                # print("print(self.predictor(decoder_output)) : ",self.predictor(decoder_output))
+                # print("print(self.predictor(decoder_output)) shape: ",self.predictor(decoder_output).shape)
+                
+                # print("Pred_proba_t shape: ",pred_proba_t.shape)
+                # print("Pred_proba_t: ",pred_proba_t)
                 output_t = pred_proba_t.data.topk(1)[1].squeeze() # [4] batch_size 
+                print(pred_proba_t.data.topk(1))
+                # print("Output_t shape: ", output_t.shape)
+                # print("Output_t: ",output_t)
 
                 output[:, t] = output_t # [4, t] batch_size, t
-
+                print("output_t : ",output[:, t])
+                print("output_t : ",output[:, t].shape)
                 preds[:,t] = pred_proba_t # [4, t, 42] batch_size, t, ntoken
-                
+                print("preds : ",preds[:,t])
+                print("preds : ",preds[:,t].shape)
+
             #output (bs, output_len)
             #preds (bs, output_len, ntoken)
             return output, preds
