@@ -10,7 +10,7 @@ class EncoderCNN(nn.Module):
         for param in resnet.parameters():
             param.requires_grad_(True)
             
-        self.resnet = nn.Sequential(*list(resnet.children())[:-2])
+        self.resnet = nn.Sequential(*list(resnet.children())[:-1])
 
     def forward(self, images):
         features = self.resnet(images)

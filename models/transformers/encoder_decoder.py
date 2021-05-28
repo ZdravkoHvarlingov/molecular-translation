@@ -10,7 +10,6 @@ class EncoderDecoderTransformer(nn.Module):
         super().__init__()
         self.encoder = EncoderCNN()
         self.decoder = TransformerModel(
-            encoder = self.encoder,
             ntoken = ntoken, 
             embed_size = embed_size, 
             nhead = nhead, 
@@ -19,7 +18,8 @@ class EncoderDecoderTransformer(nn.Module):
             dropout = dropout
         )
         
-    def forward(self, images, captions, mode):
-        outputs = self.decoder(images, captions, mode)
+    def forward(self, images, captions):
+        encoded_images = self.encoder(images)
+        outputs = self.decoder(encoded_images, captions)
         
         return outputs
