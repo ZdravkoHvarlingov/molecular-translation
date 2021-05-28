@@ -93,11 +93,7 @@ class EfficientEncoderDecoderTrainer:
             model.train()
                 
                 
-            if plot_metrics:
-                assert train_losses
-                assert train_levenshteins
-                assert val_losses
-                assert val_levenshteins
+            if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
 
                 import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -113,11 +109,12 @@ class EfficientEncoderDecoderTrainer:
         losses = []
         levenshteins = []
         with torch.no_grad():
-            loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
+            # loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
             dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size)
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
+
                 outputs, _ = model(image, captions)
                 targets = captions[:, 1:]
                 

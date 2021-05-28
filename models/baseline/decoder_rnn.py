@@ -78,10 +78,10 @@ class DecoderRNN(nn.Module):
             h,c = self.lstm_cell(lstm_input, (h,c))
             
             output = self.fcn(self.dropout(h))
+
             output = output.view(batch_size,-1)
             
             #select the word
-            predicted_word_idx = output.argmax(dim=1)
             
             # add the selected words to the predicted words tensor
             preds[:,i] = output
