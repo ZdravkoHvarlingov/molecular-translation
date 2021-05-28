@@ -11,6 +11,7 @@ from Levenshtein import distance as levenshtein_distance
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pathlib import Path
+import os
 
 from time import time
 
@@ -46,7 +47,7 @@ class EncoderDecoderTrainer:
             embed_size=self.embed_size,
             nhead = 2, 
             nhid = 200, 
-            nlayers = 2, 
+            nlayers = 3, 
             dropout = 0.3
         ).to(device)
 
@@ -89,20 +90,14 @@ class EncoderDecoderTrainer:
             for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
 
-
                 optimizer.zero_grad()
                 
-                outputs = model(image, captions, mode = "train")
-                # targets = captions[:, 1:]
-                # outputs = outputs[:,:,1:]
+                encoded_images = model.encoder(image)
 
-                # outputs = [4, 42, x] -> [4x, 42]
-                # captions = [4, x] ->    [4x]
-                # print("Ouptuts shape: ", outputs.shape)
-                # print("captions shape: ", captions.shape)
+                outputs = model.decoder(src = encoded_images, captions = captions)
 
                 loss = loss_func(outputs, captions)
-                # loss = loss_func(outputs.reshape(-1, vocab_size), captions.reshape(-1))
+
                 
                 print("The loss in the training phase is: ", loss.item())
                 loss.backward()
@@ -110,26 +105,25 @@ class EncoderDecoderTrainer:
 
             model.eval()
             print(f'Training set evaluation:')
-            train_loss, train_levenshtein = self._evaluate_model(model, train_df, mode="eval")
-            train_losses.append(train_loss)
+            train_levenshtein = self._evaluate_model(model, train_df)
+            # train_losses.append(train_loss)
             train_levenshteins.append(train_levenshtein)
 
             print(f'Validation set evaluation:')
-            val_loss, val_levenshtein = self._evaluate_model(model, validation_df, mode="eval")
-            val_losses.append(val_loss)
+            val_levenshtein = self._evaluate_model(model, validation_df)
+            # val_losses.append(val_loss)
             val_levenshteins.append(val_levenshtein)
             model.train()
                 
                 
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
 
-                import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
                 self._plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
 
             self._save_model(model, epoch)
         
-    def _evaluate_model(self, model, dataframe, mode):
+    def _evaluate_model(self, model, dataframe):
         vocab = self.vocab
         vocab_size = len(vocab)
 
@@ -142,32 +136,18 @@ class EncoderDecoderTrainer:
 
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
-                
-                outputs, preds = model(image, captions, mode=mode)
 
                 targets = captions[:, 1:]
-                outputs = outputs[:, 1:]
-                # preds = preds[:,1:,:]
-                # print("Targets shape: ",targets.shape)
-                # print("outputs shape: ",outputs.shape)
-                # print("Preds shape: ",preds.shape)
-                # print("captions shape: ",captions.shape)
 
-
-                loss = loss_func(preds.transpose(1,2).float(), captions)
-
-                losses.append(loss.detach().item())
-                outputs = outputs[:, 1:]
-                predicted_word_idx_list = outputs
+                encoded_images = model.encoder(image)
                 
-                # predicted_word_idx_list = model.decoder.generate_caption_from_predictions(outputs, vocab)
+                predicted_word_idx_list = model.decoder.generate_caption(encoded_images, vocab=vocab, max_length=300)
                 batch_levenshtein = self._calc_batch_levenshtein(predicted_word_idx_list, targets, verbose)
                 levenshteins.append(batch_levenshtein) 
 
                 verbose = False            
-            print("Mean loss: ", np.mean(losses))
             print("Mean levensthein: ", np.mean(levenshteins))
-            return np.mean(losses), np.mean(levenshteins)
+            return np.mean(levenshteins)
 
     def _calc_batch_levenshtein(self, predicted_word_idx, targets, verbose=False):
         predicted_word_idx = list(predicted_word_idx.cpu().numpy())
@@ -231,12 +211,12 @@ class EncoderDecoderTrainer:
     def _plot_metrics(self, train_losses, train_levenshteins, val_losses, val_levenshteins):
         print("Plotting metrics!")
         
-        plt.title("Train/Validation Loss")
-        plt.plot(train_losses, label="train")
-        plt.plot(val_losses, label="validation")
-        plt.legend()
-        plt.savefig('TrainValidationLoss.png')
-        plt.clf()
+        # plt.title("Train/Validation Loss")
+        # plt.plot(train_losses, label="train")
+        # plt.plot(val_losses, label="validation")
+        # plt.legend()
+        # plt.savefig('TrainValidationLoss.png')
+        # plt.clf()
         
         plt.title("Train/Validation Levenshtein")
         plt.plot(train_levenshteins, label="train")
