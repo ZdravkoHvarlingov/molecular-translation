@@ -99,11 +99,7 @@ class EncoderDecoderTrainer:
             model.train()
                 
                 
-            if plot_metrics:
-                assert train_losses
-                assert train_levenshteins
-                assert val_losses
-                assert val_levenshteins
+            if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
 
                 import os
                 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -119,19 +115,16 @@ class EncoderDecoderTrainer:
         losses = []
         levenshteins = []
         with torch.no_grad():
-            loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
+            # loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
             dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size)
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
-                outputs, alpha = model(image, captions)
+                # outputs, alpha = model(image, captions)
                 targets = captions[:, 1:]
 
-                loss = loss_func(outputs.contiguous().view(-1, vocab_size), targets.reshape(-1))
-                
-                losses.append(loss.detach().item())
-
-                predicted_word_idx_list = model.decoder.generate_caption_from_predictions(outputs, vocab)
+                encoded_images = model.encoder(image)
+                predicted_word_idx_list, alphas = model.decoder.generate_caption(encoded_images, vocab = vocab, max_length = 300)
                 batch_levenshtein = self._calc_batch_levenshtein(predicted_word_idx_list, targets, verbose)
                 levenshteins.append(batch_levenshtein) 
 
