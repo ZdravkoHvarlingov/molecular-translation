@@ -67,36 +67,38 @@ class DecoderRNN(nn.Module):
         h, c = self.init_hidden_state(features)
         
         alphas=[]
-        
         word = torch.tensor(vocab.stoi['<SOS>']).view(1,-1).to(device)
-        embeds = self.embedding(word)
+        all_words = [word for i in range(batch_size)]
+        words = torch.stack(all_words, dim=0).squeeze(dim=1)
+
+        embeds = self.embedding(words)
+        captions = torch.zeros(batch_size, max_length).to(device)
+
 
         #??
-        captions=[]
-        
+        # captions=[]
         for i in range(max_length):
             alpha, context = self.attention(features, h)
             
             alphas.append(alpha.cpu().detach().numpy())
-            
             lstm_input = torch.cat((embeds[:, 0], context), dim=1)
             h,c = self.lstm_cell(lstm_input, (h,c))
             output = self.fcn(self.dropout(h))
+
             output = output.view(batch_size,-1)
             
             #select the word
+            
             predicted_word_idx = output.argmax(dim=1)
             
-            #save the generated word
-            captions.append(predicted_word_idx.item())
-            
-            if predicted_word_idx.item() == vocab.stoi["<EOS>"]:
-                break
+            # add the selected words to the predicted words tensor
+            captions[:,i] = predicted_word_idx
+    
             
             #send generated word as the next caption
-            embeds = self.embedding(predicted_word_idx.unsqueeze(0))
-            
-        return [vocab.itos[idx] for idx in captions], alphas
+            embeds = self.embedding(predicted_word_idx.unsqueeze(0)).transpose(0,1)
+
+        return captions, alphas
     
     def init_hidden_state(self, encoder_out):
         mean_encoder_out = encoder_out.mean(dim=1)
