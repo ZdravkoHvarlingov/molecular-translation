@@ -1,66 +1,44 @@
-from math import pi
+import os
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 import torch.optim as optim
-
-from common.dataset import retrieve_evaluate_dataloader, retrieve_train_dataloader
+from common.dataset import (retrieve_evaluate_dataloader,
+                            retrieve_train_dataloader)
 from common.vocabulary import Vocabulary
-from models.transformers.encoder_decoder import EncoderDecoderTransformer
 from Levenshtein import distance as levenshtein_distance
+from models.transformers.encoder_decoder_transformer import EncoderDecoderTransformer
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-from pathlib import Path
-import os
 
-from time import time
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class EncoderDecoderTrainer:
 
-    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4):
-        self.embed_size = embed_size
-        self.attention_dim = attention_dim
-        self.encoder_dim = encoder_dim
-        self.decoder_dim = decoder_dim
+    def __init__(self, sequence_length=405, batch_size=4):
         self.batch_size = batch_size
+        self.sequence_length = sequence_length
         self.vocab = Vocabulary()
     
     def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False):
         torch.cuda.empty_cache()
         saved_params = None
         trained_epochs = 0
+
         if load_state_file is not None:
             saved_params = torch.load(load_state_file)
-            self.embed_size = saved_params['embed_size']
-            self.attention_dim = saved_params['attention_dim']
-            self.encoder_dim = saved_params['encoder_dim']
-            self.decoder_dim = saved_params['decoder_dim']
             trained_epochs = saved_params['num_epochs']
 
-        
         print("Using Transformer model!")
         model = EncoderDecoderTransformer(
-            ntoken = len(self.vocab),
-            embed_size=self.embed_size,
-            nhead = 2, 
-            nhid = 200, 
-            nlayers = 3, 
-            dropout = 0.3
+            sequence_length=self.sequence_length,
+            vocab = self.vocab
         ).to(device)
-
-
-        print(len(self.vocab))
-
-        # ntokens = len(vocab.stoi) # the size of vocabulary
-        # emsize = 200 # embedding dimension
-        # nhead = 2 # the number of heads in the multiheadattention models
-        # nhid = 200 # the dimension of the feedforward network model in nn.TransformerEncoder
-        # nlayers = 2 # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-        # dropout = 0.2 # the dropout value
-
 
         if saved_params is not None:
             model.load_state_dict(saved_params['state_dict'])
@@ -70,9 +48,7 @@ class EncoderDecoderTrainer:
 
     def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
         train_df, validation_df, _ = self._split_train_val_test(dataframe)
-
-        
-        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=self.batch_size)
+        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=self.batch_size, sequence_length=self.sequence_length)
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
         optimizer = optim.Adam(model.parameters(), lr = 3e-4)
@@ -80,45 +56,42 @@ class EncoderDecoderTrainer:
 
         train_losses, val_losses = [], []
         train_levenshteins, val_levenshteins = [], []
-        
-
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
             print("\n Epoch: ", epoch)
 
 
             print("Training! ")
-            for image, captions in tqdm(dataloader):
-                image, captions = image.to(device), captions.to(device)
+            for images, captions in tqdm(dataloader):
+                images, captions = images.to(device), captions.to(device)
 
                 optimizer.zero_grad()
+
+                targets = captions[:, 1:]
+                preds = model(images, 'train', captions)
+
+                loss = loss_func(preds.reshape(-1, vocab_size), targets.reshape(-1))
                 
-                encoded_images = model.encoder(image)
-
-                outputs = model.decoder(src = encoded_images, captions = captions)
-
-                loss = loss_func(outputs, captions)
-
-                
-                print("The loss in the training phase is: ", loss.item())
                 loss.backward()
                 optimizer.step()
 
             model.eval()
             print(f'Training set evaluation:')
-            train_levenshtein = self._evaluate_model(model, train_df)
-            # train_losses.append(train_loss)
+            train_loss, train_levenshtein = self._evaluate_model(model, train_df)
+            train_losses.append(train_loss)
             train_levenshteins.append(train_levenshtein)
+            print(f'Training set avg loss: {train_loss}')
+            print(f'Training set avg levenshteins: {train_levenshtein}')
 
             print(f'Validation set evaluation:')
-            val_levenshtein = self._evaluate_model(model, validation_df)
-            # val_losses.append(val_loss)
+            val_loss, val_levenshtein = self._evaluate_model(model, validation_df)
+            val_losses.append(val_loss)
             val_levenshteins.append(val_levenshtein)
+            print(f'Validation set avg loss: {val_loss}')
+            print(f'Validation set avg levenshteins: {val_levenshtein}')
+            
             model.train()
                 
-                
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
-
-                os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
                 self._plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
 
             self._save_model(model, epoch)
@@ -132,22 +105,24 @@ class EncoderDecoderTrainer:
         levenshteins = []
         with torch.no_grad():
             loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
-            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size)
+            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size, sequence_length=self.sequence_length)
 
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
 
                 targets = captions[:, 1:]
+                preds = model(image, 'eval')
 
-                encoded_images = model.encoder(image)
+                loss = loss_func(preds.reshape(-1, vocab_size), targets.reshape(-1))
+                losses.append(loss.detach().item())
                 
-                predicted_word_idx_list = model.decoder.generate_caption(encoded_images, vocab=vocab, max_length=300)
+                predicted_word_idx_list = model.generate_id_sequence_from_predictions(preds)
                 batch_levenshtein = self._calc_batch_levenshtein(predicted_word_idx_list, targets, verbose)
                 levenshteins.append(batch_levenshtein) 
 
-                verbose = False            
-            print("Mean levensthein: ", np.mean(levenshteins))
-            return np.mean(levenshteins)
+                verbose = False
+
+            return np.mean(losses), np.mean(levenshteins)
 
     def _calc_batch_levenshtein(self, predicted_word_idx, targets, verbose=False):
         predicted_word_idx = list(predicted_word_idx.cpu().numpy())
@@ -195,14 +170,8 @@ class EncoderDecoderTrainer:
     def _save_model(self, model, num_epochs):
         model_state = {
             'num_epochs':num_epochs,
-            'embed_size':self.embed_size,
-            'vocab_size':len(self.vocab),
-            'attention_dim': self.attention_dim,
-            'encoder_dim': self.encoder_dim,
-            'decoder_dim': self.decoder_dim,
             'state_dict':model.state_dict()
         }
-
         
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
@@ -211,12 +180,12 @@ class EncoderDecoderTrainer:
     def _plot_metrics(self, train_losses, train_levenshteins, val_losses, val_levenshteins):
         print("Plotting metrics!")
         
-        # plt.title("Train/Validation Loss")
-        # plt.plot(train_losses, label="train")
-        # plt.plot(val_losses, label="validation")
-        # plt.legend()
-        # plt.savefig('TrainValidationLoss.png')
-        # plt.clf()
+        plt.title("Train/Validation Loss")
+        plt.plot(train_losses, label="train")
+        plt.plot(val_losses, label="validation")
+        plt.legend()
+        plt.savefig('TrainValidationLoss.png')
+        plt.clf()
         
         plt.title("Train/Validation Levenshtein")
         plt.plot(train_levenshteins, label="train")

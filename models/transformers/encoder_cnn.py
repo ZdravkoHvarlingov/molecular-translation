@@ -3,6 +3,9 @@ import torchvision.models as models
 
 
 class EncoderCNN(nn.Module):
+
+    IMAGE_FEATURE_SIZE = 2048
+
     def __init__(self):
         super(EncoderCNN, self).__init__()
         resnet = models.resnet50(pretrained=True)
@@ -10,7 +13,7 @@ class EncoderCNN(nn.Module):
         for param in resnet.parameters():
             param.requires_grad_(True)
             
-        self.resnet = nn.Sequential(*list(resnet.children())[:-1])
+        self.resnet = nn.Sequential(*list(resnet.children())[:-2])
 
     def forward(self, images):
         features = self.resnet(images)
@@ -18,5 +21,4 @@ class EncoderCNN(nn.Module):
         features = features.view(features.size(0), -1, features.size(-1))
 
         # shape = [batch_size, 64, 2048]
-
         return features
