@@ -12,7 +12,7 @@ class MoleculesDataset(Dataset):
         self.df = data_df
         self.transform = transform
         self.vocab = vocab
-        self.sequence_length = sequence_length - 2 # -2 because of EOS and EOS tokens
+        self.sequence_length = sequence_length
         self.sos_id = vocab.stoi['<SOS>']
         self.eos_id = vocab.stoi['<EOS>']
         self.pad_id = vocab.stoi['<PAD>']
@@ -28,7 +28,7 @@ class MoleculesDataset(Dataset):
         tensor_image = torchvision.transforms.ToTensor()(pil_img)
         
         numericalized_inchi = self.vocab.numericalize(row["InChI"])
-        numericalized_inchi = numericalized_inchi[:self.sequence_length]
+        numericalized_inchi = numericalized_inchi[:self.sequence_length - 2] # -2 because of SOS and EOS tokens
 
         caption_vec = []
         caption_vec.append(self.sos_id)
