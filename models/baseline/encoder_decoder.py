@@ -22,9 +22,15 @@ class EncoderDecoder(nn.Module):
     def forward(self, images, mode='train', captions=None):
         features = self.encoder(images)
         outputs = self.decoder(features, mode, captions)
+<<<<<<< HEAD
 
         return outputs
         
+=======
+
+        return outputs
+
+>>>>>>> 1e73851 (Baseline eval prediction improved with loss included)
     def generate_id_sequence_from_predictions(self, predictions):
         predicted_word_idx = predictions.argmax(dim=2)
 

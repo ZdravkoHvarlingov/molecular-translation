@@ -1,15 +1,16 @@
 import torch
 import torch.nn as nn
-import numpy as np
 import torch.optim as optim
-
-from common.dataset import retrieve_evaluate_dataloader, retrieve_train_dataloader
+from common.dataset import (retrieve_evaluate_dataloader,
+                            retrieve_train_dataloader)
 from common.vocabulary import Vocabulary
+
 from models.EfficientNet.efficientEncoder_decoder import EfficientEncoderDecoder
 from Levenshtein import distance as levenshtein_distance
+from models.baseline.encoder_decoder import EncoderDecoder
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-from pathlib import Path
+
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -66,8 +67,6 @@ class EfficientEncoderDecoderTrainer:
 
         for epoch in tqdm(range(trained_epochs + 1, trained_epochs + num_epochs + 1), position=0, leave=True):
             print("\n Epoch: ", epoch)
-
-            print("Training! ")
             for image, captions in tqdm(dataloader):
                 image, captions = image.to(device), captions.to(device)
 
@@ -94,9 +93,6 @@ class EfficientEncoderDecoderTrainer:
                 
                 
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
-
-                import os
-                os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
                 self._plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
 
             self._save_model(model, epoch)
@@ -109,19 +105,24 @@ class EfficientEncoderDecoderTrainer:
         losses = []
         levenshteins = []
         with torch.no_grad():
-            # loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
-            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size)
+            loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
+            dataloader = retrieve_evaluate_dataloader(
+                dataframe,
+                vocab,
+                batch_size=self.batch_size,
+                sequence_length=self.sequence_length)
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)
 
-                outputs, _ = model(image, captions)
-                targets = captions[:, 1:]
-                
-                loss = loss_func(outputs.view(-1, vocab_size), targets.reshape(-1))
+                preds = model(image, 'eval')
+                targets = captions[:, 1:] # Remove <SOS> token
+
+                loss = loss_func(preds.view(-1, vocab_size), targets.reshape(-1))
                 losses.append(loss.detach().item())
 
-                predicted_word_idx_list = model.decoder.generate_caption_from_predictions(outputs, vocab)
+                predicted_word_idx_list = model.generate_id_sequence_from_predictions(preds)
+
                 batch_levenshtein = self._calc_batch_levenshtein(predicted_word_idx_list, targets, verbose)
                 levenshteins.append(batch_levenshtein) 
 
