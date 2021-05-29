@@ -19,6 +19,4 @@ class EncoderCNN(nn.Module):
 
         # shape = [batch_size, 64, 2048]
 
-
-
         return features

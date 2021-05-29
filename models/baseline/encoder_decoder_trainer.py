@@ -97,13 +97,18 @@ class EncoderDecoderTrainer:
             train_loss, train_levenshtein = self._evaluate_model(model, train_df)
             train_losses.append(train_loss)
             train_levenshteins.append(train_levenshtein)
+            print(f'Training set avg loss: {train_loss}')
+            print(f'Training set avg levenshteins: {train_levenshtein}')
 
             print(f'Validation set evaluation:')
             val_loss, val_levenshtein = self._evaluate_model(model, validation_df)
             val_losses.append(val_loss)
             val_levenshteins.append(val_levenshtein)
-            model.train()
-  
+            print(f'Validation set avg loss: {val_loss}')
+            print(f'Validation set avg levenshteins: {val_levenshtein}')
+
+            model.train()    
+                
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
                 self._plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
 
@@ -195,7 +200,6 @@ class EncoderDecoderTrainer:
             'state_dict':model.state_dict()
         }
 
-        
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
         torch.save(model_state,f'saved_models/transformer_model_state_epoch_{num_epochs}.pth')
