@@ -7,12 +7,15 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms.transforms import Compose, Normalize, Resize, RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
 
-
 class MoleculesDataset(Dataset):
-    def __init__(self, data_df, vocab, transform):
+    def __init__(self, data_df, vocab, transform, sequence_length):
         self.df = data_df
         self.transform = transform
         self.vocab = vocab
+        self.sequence_length = sequence_length - 2 # -2 because of EOS and EOS tokens
+        self.sos_id = vocab.stoi['<SOS>']
+        self.eos_id = vocab.stoi['<EOS>']
+        self.pad_id = vocab.stoi['<PAD>']
         
     def __len__(self):
         return len(self.df)
@@ -24,11 +27,19 @@ class MoleculesDataset(Dataset):
         pil_img = Image.open(row["image_url"])
         tensor_image = torchvision.transforms.ToTensor()(pil_img)
         
+        numericalized_inchi = self.vocab.numericalize(row["InChI"])
+        numericalized_inchi = numericalized_inchi[:self.sequence_length]
+
         caption_vec = []
-        caption_vec += [self.vocab.stoi["<SOS>"]]
-        caption_vec += self.vocab.numericalize(row["InChI"])
-        caption_vec += [self.vocab.stoi["<EOS>"]]
+        caption_vec.append(self.sos_id)
+        caption_vec.extend(numericalized_inchi)
+        caption_vec.append(self.eos_id)
         
+        if len(caption_vec) < self.sequence_length:
+            padding_length = self.sequence_length - len(caption_vec)
+            padding_list = [self.pad_id] * padding_length
+            caption_vec.extend(padding_list)
+
         return (
             self.transform(tensor_image),
             torch.as_tensor(caption_vec)
@@ -52,7 +63,7 @@ class CapsCollate:
         return imgs,targets
 
 
-def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True):
+def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True, sequence_length=405):
     pad_idx = vocab.stoi['<PAD>']
     transform = Compose([
         RandomVerticalFlip(),
@@ -62,7 +73,7 @@ def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffl
         Normalize(mean=[0.5], std=[0.5]),
     ])
 
-    dataset = MoleculesDataset(dataframe, vocab, transform)
+    dataset = MoleculesDataset(dataframe, vocab, transform, sequence_length)
     dataloader = DataLoader(
         dataset, 
         batch_size=batch_size, 
@@ -74,14 +85,14 @@ def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffl
 
     return dataloader
 
-def retrieve_evaluate_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=False):
+def retrieve_evaluate_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=False, sequence_length=405):
     pad_idx = vocab.stoi['<PAD>']
     transform = Compose([
         Resize((256,256)),
         Normalize(mean=[0.5], std=[0.5])
     ])
 
-    dataset = MoleculesDataset(dataframe, vocab, transform)
+    dataset = MoleculesDataset(dataframe, vocab, transform, sequence_length)
     dataloader = DataLoader(
         dataset, 
         batch_size=batch_size, 

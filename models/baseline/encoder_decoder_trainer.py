@@ -18,12 +18,13 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderDecoderTrainer:
 
-    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4):
+    def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4, sequence_length=405):
         self.embed_size = embed_size
         self.attention_dim = attention_dim
         self.encoder_dim = encoder_dim
         self.decoder_dim = decoder_dim
         self.batch_size = batch_size
+        self.sequence_length = sequence_length
         self.vocab = Vocabulary()
     
     def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False):
@@ -59,7 +60,11 @@ class EncoderDecoderTrainer:
 
     def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
         train_df, validation_df, test_df = self._split_train_val_test(dataframe)
-        dataloader = retrieve_train_dataloader(train_df, self.vocab, batch_size=self.batch_size)
+        dataloader = retrieve_train_dataloader(
+            train_df,
+            self.vocab,
+            batch_size=self.batch_size,
+            sequence_length=self.sequence_length)
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
         optimizer = optim.Adam(model.parameters(), lr = 3e-4)
@@ -113,8 +118,11 @@ class EncoderDecoderTrainer:
         losses = []
         levenshteins = []
         with torch.no_grad():
-            # loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
-            dataloader = retrieve_evaluate_dataloader(dataframe, vocab, batch_size=self.batch_size)
+            dataloader = retrieve_evaluate_dataloader(
+                dataframe,
+                vocab,
+                batch_size=self.batch_size,
+                sequence_length=self.sequence_length)
             
             for image, captions in tqdm(dataloader, position=0, leave=True):
                 image, captions = image.to(device), captions.to(device)

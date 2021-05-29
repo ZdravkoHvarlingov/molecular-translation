@@ -8,3 +8,5 @@ __pycache__/
 *.pyc
 
 saved_models/
+
+test.py
