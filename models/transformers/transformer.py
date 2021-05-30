@@ -57,7 +57,7 @@ class TransformerModel(nn.Module):
         )
         
         preds = self.pred_linear(output).transpose(0, 1)
-        return preds[:,1:,:]
+        return preds[:,:-1,:]
 
     def _forward_eval(self, encoded_images):
         encoded_images = self.cnn_to_embedding(encoded_images)
@@ -70,10 +70,9 @@ class TransformerModel(nn.Module):
 
         seq_length = self.sequence_length - 1 # We do not want to predict the starting <SOS> token
         final_logits = torch.zeros(batch_size, seq_length, self.vocab_size).to(device)
-
         for i in range(1, self.sequence_length):
             tgt_mask = self.tgt_mask[:i, :i]
-
+            
             tgt = input_matrix[:, :i]
             embedded_tgt = self.embedding(tgt)
             embedded_tgt = self.pos_encoder(embedded_tgt)
@@ -92,43 +91,6 @@ class TransformerModel(nn.Module):
             input_matrix[:, i] = predicted_word_idx
 
         return final_logits
-
-    def generate_caption(self, encoded_images):
-        encoded_images = self.linear(encoded_images) # [batch_size, 1, emb_dim]
-        encoded_images = self.pos_encoder(encoded_images) # [batch_size, 1, emb_dim]
-        encoded_images = self.transformer_encoder(encoded_images) # [batch_size, 1, emb_dim]
-
-        batch_size = encoded_images.size(0)
-
-        word = torch.tensor(self.sos_id).view(1,-1).to(device)
-        all_words = [word] * batch_size
-        words = torch.stack(all_words, dim=0).squeeze(dim=1)
-
-        word_embeddings = self.embedding(words) # [batch_size, 1, emb_dim]
-
-        captions = torch.zeros(batch_size, max_length).long().to(device) # [batch_size, max_length]
-
-        encoded_images = encoded_images.transpose(0,1) # [1, batch_size, emb_dim]
-        word_embeddings = word_embeddings.transpose(0,1) # [1, batch_size, emb_dim]
-
-        for i in range(1,max_length):
-            tgt_mask = self.generate_square_subsequent_mask(i).to(device)
-
-
-            decoder_output = self.transformer_decoder(tgt=word_embeddings[:i, :],
-                                        tgt_mask=tgt_mask,
-                                        memory=encoded_images,
-                                        ) # [i, 4, 200] i, batch_size, embedding_dim
-
-            pred_proba_t = self.predictor(decoder_output)[-1, :] # [i, 4, 42] i, batch_size, ntoken -> the slice makes it [4, 42] batch_size, ntoken
-
-            output_t = torch.topk(pred_proba_t, 1)[1].squeeze() # [4] batch_size (most likely tokens for each of the images in the batch)
-
-            captions[:, i] = output_t # [4, t] batch_size, i
-
-            word_embeddings = self.embedding(captions[:, :(i+1)]).transpose(0,1) # [i, batch_size, emb_dim]
-        
-        return captions
 
 
 class PositionalEncoding(nn.Module):
