@@ -57,6 +57,7 @@ class TransformerModel(nn.Module):
         )
         
         preds = self.pred_linear(output).transpose(0, 1)
+        # Right shifting is required so the transformer learns NOT to just copy the target input
         return preds[:,:-1,:]
 
     def _forward_eval(self, encoded_images):

@@ -77,7 +77,26 @@ class TrainingUtils:
         plt.clf()
 
     @staticmethod
-    def evaluate_model_on_dataset(model, dataframe, sequence_length, batch_size, vocab, mode='train'):
+    def evaluate_model_on_dataset(model, dataframe, sequence_length: int, batch_size: int, vocab, mode='train'):
+        """
+        Evaluates the specified model with the specified dataset.
+        Returns the average loss and levenshtein distance of the dataset across all batches of the specified batch size.
+
+        Parameters
+        ----------
+        model : torch.nn.Module
+            A model which is intended to predict InChI formula based on an image.
+        dataframe : pandas.Dataframe
+            The dataset to be evaluated.
+        sequence_length : int
+            The maximum sequence length based on the InChI formulas in the dataset.
+        batch_size : int
+        vocab : Vocabulary
+        mode : str
+            Mode parameter specifies the forward method of the model.
+            In case of 'train' the model will receive the captions as an input to the forward method which is much faster but usually applies teacher forcing.
+            In case of 'eval' the model will NOT receive the captions as an input to the forward method which is much slower but shows the real accuracy of the model.
+        """
         vocab_size = len(vocab)
 
         losses = []
