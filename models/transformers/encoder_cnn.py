@@ -3,6 +3,9 @@ import torchvision.models as models
 
 
 class EncoderCNN(nn.Module):
+
+    IMAGE_FEATURE_SIZE = 2048
+
     def __init__(self):
         super(EncoderCNN, self).__init__()
         resnet = models.resnet50(pretrained=True)
