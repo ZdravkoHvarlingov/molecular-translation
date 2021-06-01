@@ -66,9 +66,9 @@ class CapsCollate:
 def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True, sequence_length=405):
     pad_idx = vocab.stoi['<PAD>']
     transform = Compose([
-        RandomVerticalFlip(),
-        RandomHorizontalFlip(),
-        RandomRotation(180),
+        # RandomVerticalFlip(),
+        # RandomHorizontalFlip(),
+        # RandomRotation(180),
         Resize((256,256)),
         Normalize(mean=[0.5], std=[0.5]),
     ])

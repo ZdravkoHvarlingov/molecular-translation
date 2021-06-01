@@ -17,7 +17,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderDecoderTrainer:
 
-    LEARNING_RATE = 3e-4
+    LEARNING_RATE = 1e-4
 
     def __init__(self, sequence_length=405, batch_size=4):
         self.batch_size = batch_size
@@ -115,4 +115,4 @@ class EncoderDecoderTrainer:
         
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
-        torch.save(model_state,f'saved_models/transformer_model_state_epoch_{num_epochs}.pth')
+        torch.save(model_state,f'saved_models/transformer_model_state.pth')

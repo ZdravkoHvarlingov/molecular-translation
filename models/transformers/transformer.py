@@ -13,18 +13,19 @@ class TransformerModel(nn.Module):
         self.vocab = vocab
         self.vocab_size = len(vocab)
 
+        self.embed_size = embed_size
+        self.embed_size_sqrt = math.sqrt(embed_size)
+
         self.cnn_to_embedding = nn.Linear(image_feature_size, embed_size)
         self.embedding = nn.Embedding(self.vocab_size, embed_size)
         self.pos_encoder = PositionalEncoding(embed_size, dropout)
         
-        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_size, nhead=num_heads, dropout=dropout)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        # encoder_layer = nn.TransformerEncoderLayer(d_model=embed_size, nhead=num_heads, dropout=dropout)
+        # self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         decoder_layer = nn.TransformerDecoderLayer(d_model=embed_size, nhead=num_heads, dropout=dropout)
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
         
         self.pred_linear = nn.Linear(embed_size, self.vocab_size)
-
-        self.softmax = nn.Softmax(dim=-1)
 
         self.sequence_length = sequence_length
         self.sos_id = vocab.stoi['<SOS>']
@@ -44,9 +45,10 @@ class TransformerModel(nn.Module):
     def _forward_train(self, encoded_images, target_captions):
         encoded_images = self.cnn_to_embedding(encoded_images)
         encoded_images = self.pos_encoder(encoded_images)
-        encoded_images = self.transformer_encoder(encoded_images)
+        encoded_images = encoded_images.transpose(0, 1)
+        #encoded_images = self.transformer_encoder(encoded_images)
 
-        embedded_target = self.embedding(target_captions)
+        embedded_target = self.embedding(target_captions) * self.embed_size_sqrt
         embedded_target = self.pos_encoder(embedded_target)
         embedded_target = embedded_target.transpose(0,1)
 
@@ -63,9 +65,10 @@ class TransformerModel(nn.Module):
     def _forward_eval(self, encoded_images):
         encoded_images = self.cnn_to_embedding(encoded_images)
         encoded_images = self.pos_encoder(encoded_images)
-        encoded_images = self.transformer_encoder(encoded_images)
+        encoded_images = encoded_images.transpose(0, 1)
+        #encoded_images = self.transformer_encoder(encoded_images)
         
-        batch_size = encoded_images.size(0)
+        batch_size = encoded_images.size(1)
         input_matrix = torch.zeros([batch_size, self.sequence_length], dtype=torch.long).to(device)
         input_matrix[:, 0] = self.sos_id
 
@@ -75,7 +78,7 @@ class TransformerModel(nn.Module):
             tgt_mask = self.tgt_mask[:i, :i]
             
             tgt = input_matrix[:, :i]
-            embedded_tgt = self.embedding(tgt)
+            embedded_tgt = self.embedding(tgt) * self.embed_size_sqrt
             embedded_tgt = self.pos_encoder(embedded_tgt)
             embedded_tgt = embedded_tgt.transpose(0,1)
 

@@ -6,10 +6,10 @@ from models.transformers.transformer import TransformerModel
 
 class EncoderDecoderTransformer(nn.Module):
 
-    NUM_HEADS = 3
-    NUM_LAYERS = 3
-    DROPOUT = 0.5
-    EMBED_SIZE = 300
+    NUM_HEADS = 2
+    NUM_LAYERS = 6
+    DROPOUT = 0.1
+    EMBED_SIZE = 512
 
     def __init__(self, vocab: Vocabulary, sequence_length):
         super().__init__()
