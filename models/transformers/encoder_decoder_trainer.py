@@ -73,6 +73,7 @@ class EncoderDecoderTrainer:
                 loss = loss_func(preds.reshape(-1, self.vocab_size), targets.reshape(-1))
                 
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
                 optimizer.step()
 
             model.eval()
