@@ -1,7 +1,5 @@
-import pandas as pd
-
-from models.baseline.encoder_decoder_trainer import EncoderDecoderTrainer as BahdanauAttention
-from models.transformers.encoder_decoder_trainer import EncoderDecoderTrainer as Transformer
+from models.baseline.encoder_decoder_operator import EncoderDecoderOperator as BahdanauAttention
+from models.transformers.encoder_decoder_operator import EncoderDecoderOperator as Transformer
 
 
 def train():
