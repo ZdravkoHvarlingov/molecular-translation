@@ -5,16 +5,16 @@ from models.transformers.encoder_decoder_trainer import EncoderDecoderTrainer as
 
 
 def train():
-    # trainer = BahdanauAttention(batch_size=4)
-    trainer = Transformer(batch_size=4)
+    trainer = BahdanauAttention(batch_size=4)
+    # trainer = Transformer(batch_size=4)
     # trainer.train(
-    #     data_csv_path='bms-molecular-translation/extended_data_1000.csv',
+    #     data_csv_path='bms-molecular-translation/extended_data_30.csv',
     #     num_epochs=1000, plot_metrics=True)
 
-    # trainer.evaluate(
-    #      data_csv_path='bms-molecular-translation/extended_data_4.csv',
-    #      model_state_file='saved_models/transformer_model_state_0_levenshtein_1000_images_300_epochs.pth'
-    # )
+    trainer.predict(
+         data_csv_path='bms-molecular-translation/extended_data_30_test.csv',
+         model_state_file='saved_models/seq2seq_rnn_model_state.pth'
+    )
 
 if __name__ == '__main__':
     train()
