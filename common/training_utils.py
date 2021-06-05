@@ -9,6 +9,7 @@ from Levenshtein import distance as levenshtein_distance
 from tqdm import tqdm
 
 from common.dataset import retrieve_evaluate_dataloader
+from common.dataset_inference import retrieve_inference_dataloader
 from common.vocabulary import Vocabulary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -67,6 +68,19 @@ class TrainingUtils:
         return np.mean(distances)
 
     @staticmethod
+    def batch_idx_sequences_to_sentenses(predicted_word_idx_sequence, vocab: Vocabulary, verbose=False):
+        predicted_word_idx = list(predicted_word_idx_sequence.cpu().numpy())
+
+        sentences = []
+        for predicted_sentence_word_idx in predicted_word_idx:
+            sentence_to_str = TrainingUtils.word_idx_to_caption_sentence(predicted_sentence_word_idx, vocab)
+            sentences.append(sentence_to_str)
+            if verbose:
+                print(f'Predicted: {sentence_to_str}')
+
+        return sentences
+
+    @staticmethod
     def word_idx_to_caption_sentence(word_idx_list, vocab: Vocabulary):
         pad_idx = vocab.stoi['<PAD>']
         eos_idx = vocab.stoi['<EOS>']
@@ -75,11 +89,11 @@ class TrainingUtils:
         for word_idx in word_idx_list:
             if word_idx == pad_idx:
                 continue
-            
-            words.append(vocab.itos[word_idx])
+
             if word_idx == eos_idx:
                 break
-
+            words.append(vocab.itos[word_idx])
+            
         return ''.join(words)
 
     @staticmethod
@@ -158,3 +172,48 @@ class TrainingUtils:
             print(f'Dataset average levenshtein: {average_levenshtein}')
 
             return np.mean(losses), np.mean(levenshteins)
+
+    @staticmethod
+    def evaluate_model_levenshtein(model, dataframe, sequence_length: int, batch_size: int, vocab):
+        levenshteins = []
+        with torch.no_grad():
+            dataloader = retrieve_evaluate_dataloader(
+                dataframe,
+                vocab,
+                batch_size=batch_size,
+                sequence_length=sequence_length)
+            
+            for image, captions in tqdm(dataloader, position=0, leave=True):
+                image, captions = image.to(device), captions.to(device)
+
+                targets = captions[:, 1:]
+                preds = model(image, 'eval')
+                
+                predicted_word_idx_list = model.generate_id_sequence_from_predictions(preds)
+                batch_levenshtein = TrainingUtils.calc_batch_levenshtein(predicted_word_idx_list, targets, vocab, True)
+                levenshteins.append(batch_levenshtein) 
+
+            average_levenshtein = np.mean(levenshteins)
+            print(f'Dataset average levenshtein: {average_levenshtein}')
+
+            return np.mean(levenshteins)
+
+    @staticmethod
+    def predict_on_dataset(model, dataframe, batch_size: int, vocab, output_file):
+        with torch.no_grad():
+            dataloader = retrieve_inference_dataloader(
+                dataframe,
+                batch_size=batch_size)
+            
+            sentences = []
+            for images in tqdm(dataloader, position=0, leave=True):
+                images = images[0].to(device)
+
+                preds = model(images, 'eval')
+
+                predicted_word_idx_list = model.generate_id_sequence_from_predictions(preds)
+                batch_sentences = TrainingUtils.batch_idx_sequences_to_sentenses(predicted_word_idx_list, vocab, True)
+                sentences.extend(batch_sentences)
+
+            with open(output_file, 'w') as result_file:
+                result_file.writelines([f'"{sentence}"\n' for sentence in sentences])

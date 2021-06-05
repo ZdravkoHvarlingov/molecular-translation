@@ -1,11 +1,15 @@
-from common.vocabulary import Vocabulary
 import torch
 import torchvision
-
 from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
-from torchvision.transforms.transforms import Compose, Normalize, Resize, RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
+from torchvision.transforms.transforms import (Compose, Normalize,
+                                               RandomHorizontalFlip,
+                                               RandomRotation,
+                                               RandomVerticalFlip, Resize)
+
+from common.vocabulary import Vocabulary
+
 
 class MoleculesDataset(Dataset):
     def __init__(self, data_df, vocab, transform, sequence_length):
