@@ -25,7 +25,7 @@ class EncoderDecoderTrainer:
         self.vocab = Vocabulary()
         self.vocab_size = len(self.vocab)
     
-    def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False):
+    def train(self, data_csv_path, num_epochs=10, load_state_file=None, plot_metrics=False):
         torch.cuda.empty_cache()
         saved_params = None
         trained_epochs = 0
@@ -44,10 +44,10 @@ class EncoderDecoderTrainer:
             model.load_state_dict(saved_params['state_dict'])
         model.train()
 
-        self._perform_training(dataframe, model, num_epochs, trained_epochs, plot_metrics)
+        self._perform_training(data_csv_path, model, num_epochs, trained_epochs, plot_metrics)
 
-    def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
-        train_df, validation_df, _ = TrainingUtils.split_train_val_test(dataframe)
+    def _perform_training(self, data_csv_path, model, num_epochs, trained_epochs=0, plot_metrics=False):
+        train_df, validation_df, _ = TrainingUtils.split_train_val_test(data_csv_path)
         dataloader = retrieve_train_dataloader(
             train_df,
             self.vocab,
@@ -94,7 +94,7 @@ class EncoderDecoderTrainer:
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
                 TrainingUtils.plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
         
-            if epoch % 100 == 0:
+            if epoch % 1 == 0:
                 model.eval()
                 print(f'Training set inference evaluation:')
                 train_loss, train_levenshtein = TrainingUtils.evaluate_model_on_dataset(

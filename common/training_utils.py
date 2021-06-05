@@ -1,5 +1,8 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from Levenshtein import distance as levenshtein_distance
@@ -13,14 +16,35 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class TrainingUtils:
     
+    TRAIN_SIZE = 0.7
+
     @staticmethod
-    def split_train_val_test(dataframe):
-        train=dataframe.sample(frac=0.7,random_state=11) #random state is a seed value
+    def split_train_val_test(data_csv_path):
+        train_file, val_file, test_file = TrainingUtils.create_split_file_names(data_csv_path)
+        
+        if os.path.isfile(train_file) and os.path.isfile(val_file) and os.path.isfile(test_file):
+            print("No split required - train, validation and test files already present")
+            return pd.read_csv(train_file), pd.read_csv(val_file), pd.read_csv(test_file)
+        
+        print("Split required - some or all of the train, validation and test files are missing")
+        
+        dataframe = pd.read_csv(data_csv_path)
+        train=dataframe.sample(frac=TrainingUtils.TRAIN_SIZE,random_state=11) #random state is a seed value
         val_test=dataframe.drop(train.index)
         val = val_test.sample(frac=0.5, random_state=12)
         test = val_test.drop(val.index)
 
+        train.to_csv(train_file)
+        val.to_csv(val_file)
+        test.to_csv(test_file)
+
         return train, val, test
+
+    @staticmethod
+    def create_split_file_names(train_csv_path: str):
+        without_extension = train_csv_path.replace(".csv", "", 1)
+
+        return f'{without_extension}_train.csv', f'{without_extension}_val.csv', f'{without_extension}_test.csv'
 
     @staticmethod
     def calc_batch_levenshtein(predicted_word_idx, targets, vocab: Vocabulary, verbose=False):
