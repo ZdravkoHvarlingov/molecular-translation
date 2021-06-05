@@ -35,7 +35,6 @@ class EncoderDecoderOperator:
             saved_params = torch.load(load_state_file)
             trained_epochs = saved_params['num_epochs']
 
-        print("Using Transformer model!")
         model = EncoderDecoderTransformer(
             sequence_length=self.sequence_length,
             vocab = self.vocab
@@ -95,7 +94,7 @@ class EncoderDecoderOperator:
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
                 TrainingUtils.plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
         
-            if epoch % 1 == 0:
+            if epoch % 100 == 0:
                 model.eval()
                 print(f'Training set inference evaluation:')
                 train_loss, train_levenshtein = TrainingUtils.evaluate_model_on_dataset(
@@ -123,7 +122,6 @@ class EncoderDecoderOperator:
         torch.cuda.empty_cache()
         saved_params = torch.load(model_state_file)
 
-        print("Using Transformer model!")
         model = EncoderDecoderTransformer(
             sequence_length=self.sequence_length,
             vocab = self.vocab
@@ -140,7 +138,6 @@ class EncoderDecoderOperator:
         torch.cuda.empty_cache()
         saved_params = torch.load(model_state_file)
 
-        print("Using Transformer model!")
         model = EncoderDecoderTransformer(
             sequence_length=self.sequence_length,
             vocab = self.vocab

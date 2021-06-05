@@ -39,7 +39,6 @@ class EncoderDecoderOperator:
             self.decoder_dim = saved_params['decoder_dim']
             trained_epochs = saved_params['num_epochs']
 
-        print("Using Bahdanau Attention model!")
         model = EncoderDecoder(
         embed_size=self.embed_size,
         vocab_size=len(self.vocab),
