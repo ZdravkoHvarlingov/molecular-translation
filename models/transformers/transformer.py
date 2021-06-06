@@ -5,6 +5,7 @@ from common.vocabulary import Vocabulary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
 class TransformerModel(nn.Module):
 
     def __init__(self, image_feature_size, embed_size, num_heads, num_layers, vocab: Vocabulary, sequence_length, dropout=0.5):
@@ -30,6 +31,13 @@ class TransformerModel(nn.Module):
         self.sequence_length = sequence_length
         self.sos_id = vocab.stoi['<SOS>']
         self.tgt_mask = self.generate_square_subsequent_mask(sequence_length).to(device)
+
+        self.init_weights()
+
+    def init_weights(self):
+        for _, p in self.named_parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)

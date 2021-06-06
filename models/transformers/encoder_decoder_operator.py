@@ -93,18 +93,6 @@ class EncoderDecoderOperator:
                 
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
                 TrainingUtils.plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
-        
-            if epoch % 100 == 0:
-                model.eval()
-                print(f'Training set inference evaluation:')
-                train_loss, train_levenshtein = TrainingUtils.evaluate_model_on_dataset(
-                    model, train_df, self.sequence_length, self.batch_size, self.vocab, 'eval'
-                )
-
-                print(f'Validation set inference evaluation:')
-                val_loss, val_levenshtein = TrainingUtils.evaluate_model_on_dataset(
-                    model, validation_df, self.sequence_length, self.batch_size, self.vocab, 'eval')
-                model.train()
 
             self._save_model(model, epoch)
 
