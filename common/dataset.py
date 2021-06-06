@@ -1,11 +1,15 @@
-from common.vocabulary import Vocabulary
 import torch
 import torchvision
-
 from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
-from torchvision.transforms.transforms import Compose, Normalize, Resize, RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
+from torchvision.transforms.transforms import (Compose, Normalize,
+                                               RandomHorizontalFlip,
+                                               RandomRotation,
+                                               RandomVerticalFlip, Resize)
+
+from common.vocabulary import Vocabulary
+
 
 class MoleculesDataset(Dataset):
     def __init__(self, data_df, vocab, transform, sequence_length):
@@ -66,9 +70,9 @@ class CapsCollate:
 def retrieve_train_dataloader(dataframe, vocab: Vocabulary, batch_size=8, shuffle=True, sequence_length=405):
     pad_idx = vocab.stoi['<PAD>']
     transform = Compose([
-        RandomVerticalFlip(),
-        RandomHorizontalFlip(),
-        RandomRotation(180),
+        # RandomVerticalFlip(),
+        # RandomHorizontalFlip(),
+        # RandomRotation(180),
         Resize((256,256)),
         Normalize(mean=[0.5], std=[0.5]),
     ])

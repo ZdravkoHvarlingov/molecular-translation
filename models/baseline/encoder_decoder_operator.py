@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,7 +16,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-class EncoderDecoderTrainer:
+class EncoderDecoderOperator:
 
     def __init__(self, embed_size=200, attention_dim=300, encoder_dim=2048, decoder_dim=300, batch_size=4, sequence_length=405):
         self.embed_size = embed_size
@@ -26,7 +27,7 @@ class EncoderDecoderTrainer:
         self.sequence_length = sequence_length
         self.vocab = Vocabulary()
     
-    def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False):
+    def train(self, data_csv_path, num_epochs=10, load_state_file=None, plot_metrics=False):
         torch.cuda.empty_cache()
         saved_params = None
         trained_epochs = 0
@@ -38,8 +39,6 @@ class EncoderDecoderTrainer:
             self.decoder_dim = saved_params['decoder_dim']
             trained_epochs = saved_params['num_epochs']
 
-        
-        print("Using Bahdanau Attention model!")
         model = EncoderDecoder(
         embed_size=self.embed_size,
         vocab_size=len(self.vocab),
@@ -54,10 +53,10 @@ class EncoderDecoderTrainer:
             model.load_state_dict(saved_params['state_dict'])
         model.train()
 
-        self._perform_training(dataframe, model, num_epochs, trained_epochs, plot_metrics)
+        self._perform_training(data_csv_path, model, num_epochs, trained_epochs, plot_metrics)
 
-    def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
-        train_df, validation_df, _ = TrainingUtils.split_train_val_test(dataframe)
+    def _perform_training(self, data_csv_path, model, num_epochs, trained_epochs=0, plot_metrics=False):
+        train_df, validation_df, _ = TrainingUtils.split_train_val_test(data_csv_path)
         dataloader = retrieve_train_dataloader(
             train_df,
             self.vocab,
@@ -119,3 +118,50 @@ class EncoderDecoderTrainer:
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
         torch.save(model_state,f'saved_models/seq2seq_rnn_model_state_epoch_{num_epochs}.pth')
+
+    def predict(self, data_csv_path: str, model_state_file):
+        torch.cuda.empty_cache()
+        saved_params = torch.load(model_state_file)
+        self.embed_size = saved_params['embed_size']
+        self.attention_dim = saved_params['attention_dim']
+        self.encoder_dim = saved_params['encoder_dim']
+        self.decoder_dim = saved_params['decoder_dim']
+
+        model = EncoderDecoder(
+            embed_size=self.embed_size,
+            vocab_size=len(self.vocab),
+            attention_dim=self.attention_dim,
+            encoder_dim=self.encoder_dim,
+            decoder_dim=self.decoder_dim,
+            sequence_length=self.sequence_length,
+            vocab=self.vocab
+        ).to(device)
+        model.load_state_dict(saved_params['state_dict'])
+        model.eval()
+
+        dataframe = pd.read_csv(data_csv_path)
+        results_file_name = data_csv_path.replace(".csv", "_results.csv")
+        TrainingUtils.predict_on_dataset(model, dataframe, self.batch_size, self.vocab, results_file_name)
+    
+    def evaluate(self, data_csv_path: str, model_state_file):
+        torch.cuda.empty_cache()
+        saved_params = torch.load(model_state_file)
+        self.embed_size = saved_params['embed_size']
+        self.attention_dim = saved_params['attention_dim']
+        self.encoder_dim = saved_params['encoder_dim']
+        self.decoder_dim = saved_params['decoder_dim']
+
+        model = EncoderDecoder(
+            embed_size=self.embed_size,
+            vocab_size=len(self.vocab),
+            attention_dim=self.attention_dim,
+            encoder_dim=self.encoder_dim,
+            decoder_dim=self.decoder_dim,
+            sequence_length=self.sequence_length,
+            vocab=self.vocab
+        ).to(device)
+        model.load_state_dict(saved_params['state_dict'])
+        model.eval()
+
+        dataframe = pd.read_csv(data_csv_path)
+        TrainingUtils.evaluate_model_levenshtein(model, dataframe, self.sequence_length, self.batch_size, self.vocab)

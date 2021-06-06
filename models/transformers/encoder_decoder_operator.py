@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import pandas as pd
 
 import torch
 import torch.nn as nn
@@ -15,9 +16,9 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-class EncoderDecoderTrainer:
+class EncoderDecoderOperator:
 
-    LEARNING_RATE = 3e-4
+    LEARNING_RATE = 1e-4
 
     def __init__(self, sequence_length=405, batch_size=4):
         self.batch_size = batch_size
@@ -25,7 +26,7 @@ class EncoderDecoderTrainer:
         self.vocab = Vocabulary()
         self.vocab_size = len(self.vocab)
     
-    def train(self, dataframe, num_epochs=10, load_state_file=None, plot_metrics=False):
+    def train(self, data_csv_path, num_epochs=10, load_state_file=None, plot_metrics=False):
         torch.cuda.empty_cache()
         saved_params = None
         trained_epochs = 0
@@ -34,7 +35,6 @@ class EncoderDecoderTrainer:
             saved_params = torch.load(load_state_file)
             trained_epochs = saved_params['num_epochs']
 
-        print("Using Transformer model!")
         model = EncoderDecoderTransformer(
             sequence_length=self.sequence_length,
             vocab = self.vocab
@@ -44,10 +44,10 @@ class EncoderDecoderTrainer:
             model.load_state_dict(saved_params['state_dict'])
         model.train()
 
-        self._perform_training(dataframe, model, num_epochs, trained_epochs, plot_metrics)
+        self._perform_training(data_csv_path, model, num_epochs, trained_epochs, plot_metrics)
 
-    def _perform_training(self, dataframe, model, num_epochs, trained_epochs=0, plot_metrics=False):
-        train_df, validation_df, _ = TrainingUtils.split_train_val_test(dataframe)
+    def _perform_training(self, data_csv_path, model, num_epochs, trained_epochs=0, plot_metrics=False):
+        train_df, validation_df, _ = TrainingUtils.split_train_val_test(data_csv_path)
         dataloader = retrieve_train_dataloader(
             train_df,
             self.vocab,
@@ -73,6 +73,7 @@ class EncoderDecoderTrainer:
                 loss = loss_func(preds.reshape(-1, self.vocab_size), targets.reshape(-1))
                 
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
                 optimizer.step()
 
             model.eval()
@@ -92,18 +93,6 @@ class EncoderDecoderTrainer:
                 
             if plot_metrics and train_losses and train_levenshteins and val_losses and val_levenshteins:
                 TrainingUtils.plot_metrics(train_losses, train_levenshteins, val_losses, val_levenshteins)
-        
-            if epoch % 100 == 0:
-                model.eval()
-                print(f'Training set inference evaluation:')
-                train_loss, train_levenshtein = TrainingUtils.evaluate_model_on_dataset(
-                    model, train_df, self.sequence_length, self.batch_size, self.vocab, 'eval'
-                )
-
-                print(f'Validation set inference evaluation:')
-                val_loss, val_levenshtein = TrainingUtils.evaluate_model_on_dataset(
-                    model, validation_df, self.sequence_length, self.batch_size, self.vocab, 'eval')
-                model.train()
 
             self._save_model(model, epoch)
 
@@ -116,3 +105,34 @@ class EncoderDecoderTrainer:
         filepath = Path(f'saved_models/')
         filepath.mkdir(parents=True, exist_ok=True)
         torch.save(model_state,f'saved_models/transformer_model_state_epoch_{num_epochs}.pth')
+
+    def predict(self, data_csv_path: str, model_state_file):
+        torch.cuda.empty_cache()
+        saved_params = torch.load(model_state_file)
+
+        model = EncoderDecoderTransformer(
+            sequence_length=self.sequence_length,
+            vocab = self.vocab
+        ).to(device)
+
+        model.load_state_dict(saved_params['state_dict'])
+        model.eval()
+        dataframe = pd.read_csv(data_csv_path)
+        
+        results_file_name = data_csv_path.replace(".csv", "_results.csv")
+        TrainingUtils.predict_on_dataset(model, dataframe, self.batch_size, self.vocab, results_file_name)
+    
+    def evaluate(self, data_csv_path: str, model_state_file):
+        torch.cuda.empty_cache()
+        saved_params = torch.load(model_state_file)
+
+        model = EncoderDecoderTransformer(
+            sequence_length=self.sequence_length,
+            vocab = self.vocab
+        ).to(device)
+
+        model.load_state_dict(saved_params['state_dict'])
+        model.eval()
+        dataframe = pd.read_csv(data_csv_path)
+        
+        TrainingUtils.evaluate_model_levenshtein(model, dataframe, self.sequence_length, self.batch_size, self.vocab)
