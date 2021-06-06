@@ -2,6 +2,7 @@ from argparse import ArgumentParser, Namespace
 
 from models.baseline.encoder_decoder_operator import EncoderDecoderOperator as BahdanauAttention
 from models.transformers.encoder_decoder_operator import EncoderDecoderOperator as Transformer
+from models.visual_transformers.encoder_decoder_operator import EncoderDecoderOperator as VisualTransformer
 
 
 # Old way of using
@@ -25,7 +26,7 @@ def parse_command_args():
     parser.add_argument("-df", "--data_file", dest="data_file", required=True,
                         help="specify the path to data stored in CSV format")
     parser.add_argument("-m", "--model", dest="model", required=True,
-                        choices=["lstm", "transformer"],
+                        choices=["lstm", "transformer", "vis_transformer"],
                         help="specify the model")
     parser.add_argument("-a", "--action", dest="action", required=True,
                         choices=["train", "evaluate", "predict"],
@@ -53,49 +54,30 @@ def perform_action(args: Namespace):
     model_state_file = args.saved_model
 
     if model_name == 'lstm':
-        perform_lstm_action(data_file_path, action, batch_size, num_epochs, model_state_file)
+        print('LSTM model chosen!')
+        operator = BahdanauAttention(batch_size=batch_size)
+        perform_model_action(operator, data_file_path, action, num_epochs, model_state_file)
+
     elif model_name == 'transformer':
-        perform_transformer_action(data_file_path, action, batch_size, num_epochs, model_state_file)
+        print('Transformer model chosen!')
+        operator = Transformer(batch_size=batch_size)
+        perform_model_action(operator, data_file_path, action, num_epochs, model_state_file)
+    
+    elif model_name == 'vis_transformer':
+        print('Visual transformer model chosen!')
+        operator = VisualTransformer(batch_size=batch_size)
+        perform_model_action(operator, data_file_path, action, num_epochs, model_state_file)
+
     else:
         print("Invalid model specified")
 
 
-def perform_lstm_action(data_file_path: str, action: str, batch_size: int, num_epochs=100, model_state_file=None):
-    print('LSTM model chosen!')
-
-    operator = BahdanauAttention(batch_size=batch_size)
+def perform_model_action(operator, data_file_path: str, action: str, num_epochs=100, model_state_file=None):
     if action == 'train':
         print(f'Training for {num_epochs} epochs.')
         operator.train(
             data_csv_path=data_file_path,
-            num_epochs=num_epochs, plot_metrics=True)
-        return
-    
-    if model_state_file is None:
-        print("Can not perform evaluation or prediction without a saved model specified!")
-        return
-
-    if action == 'evaluate':
-        print(f'Evaluating model.')
-        operator.evaluate(
-            data_csv_path=data_file_path,
-            model_state_file=model_state_file)
-
-    elif action == 'predict':
-        print(f'Predicting with model.')
-        operator.predict(
-            data_csv_path=data_file_path,
-            model_state_file=model_state_file)
-
-
-def perform_transformer_action(data_file_path: str, action: str, batch_size: int, num_epochs=100, model_state_file=None):
-    print('Transformer model chosen!')
-
-    operator = Transformer(batch_size=batch_size)
-    if action == 'train':
-        print(f'Training for {num_epochs} epochs.')
-        operator.train(
-            data_csv_path=data_file_path,
+            load_state_file=model_state_file,
             num_epochs=num_epochs, plot_metrics=True)
         return
     
