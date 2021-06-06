@@ -26,7 +26,7 @@ def parse_command_args():
     parser.add_argument("-df", "--data_file", dest="data_file", required=True,
                         help="specify the path to data stored in CSV format")
     parser.add_argument("-m", "--model", dest="model", required=True,
-                        choices=["lstm", "transformer"],
+                        choices=["lstm", "transformer", "vis_transformer"],
                         help="specify the model")
     parser.add_argument("-a", "--action", dest="action", required=True,
                         choices=["train", "evaluate", "predict"],
