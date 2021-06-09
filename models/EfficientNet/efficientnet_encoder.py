@@ -8,13 +8,14 @@ VALID_MODELS = (
 )
 
 class EfficientNetEncoder(nn.Module):
+  IMAGE_FEATURE_SIZE = 1536
   def __init__(self, model_name):
     super(EfficientNetEncoder, self).__init__()
 
     if model_name not in VALID_MODELS:
             raise ValueError('model_name should be one of: ' + ', '.join(VALID_MODELS))
 
-    self.effNet = EfficientNet.from_name(model_name, in_channels=1, num_classes=2048, include_top=False)
+    self.effNet = EfficientNet.from_pretrained(model_name, in_channels=1, num_classes=2048, include_top=False)
 
   def forward(self, images):
     features = self.effNet(images)

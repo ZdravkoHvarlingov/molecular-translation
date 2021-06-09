@@ -1,8 +1,10 @@
+import os
 from argparse import ArgumentParser, Namespace
 
 from models.baseline.encoder_decoder_operator import EncoderDecoderOperator as BahdanauAttention
 from models.transformers.encoder_decoder_operator import EncoderDecoderOperator as Transformer
 from models.visual_transformers.encoder_decoder_operator import EncoderDecoderOperator as VisualTransformer
+from models.EfficientNet.efficient_enc_dec_operator import EncoderDecoderOperator as EfficientNetTransformer
 
 
 # Old way of using
@@ -26,7 +28,7 @@ def parse_command_args():
     parser.add_argument("-df", "--data_file", dest="data_file", required=True,
                         help="specify the path to data stored in CSV format")
     parser.add_argument("-m", "--model", dest="model", required=True,
-                        choices=["lstm", "transformer", "vis_transformer"],
+                        choices=["lstm", "transformer", "vis_transformer", "efficient_net"],
                         help="specify the model")
     parser.add_argument("-a", "--action", dest="action", required=True,
                         choices=["train", "evaluate", "predict"],
@@ -46,6 +48,7 @@ def parse_command_args():
 
 
 def perform_action(args: Namespace):
+
     data_file_path = args.data_file
     model_name = args.model
     action = args.action
@@ -67,7 +70,10 @@ def perform_action(args: Namespace):
         print('Visual transformer model chosen!')
         operator = VisualTransformer(batch_size=batch_size)
         perform_model_action(operator, data_file_path, action, num_epochs, model_state_file)
-
+    elif model_name == 'efficient_net':
+        print('EfficientNet+Transformer model chosen!')
+        operator = EfficientNetTransformer(batch_size=batch_size)
+        perform_model_action(operator, data_file_path, action, num_epochs, model_state_file)
     else:
         print("Invalid model specified")
 
