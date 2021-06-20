@@ -60,8 +60,7 @@ class EncoderDecoderOperator:
         dataloader = retrieve_train_dataloader(
             train_df,
             self.vocab,
-            batch_size=self.batch_size,
-            sequence_length=self.sequence_length)
+            batch_size=self.batch_size)
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
         optimizer = optim.Adam(model.parameters(), lr = 3e-4)

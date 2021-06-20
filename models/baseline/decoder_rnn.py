@@ -46,7 +46,7 @@ class DecoderRNN(nn.Module):
         h, c = self.init_hidden_state(features) #(batch_size, decoder_dim)
         
         # get the seq length to iterate, we remove 1 because we do NOT want to predict the <SOS> token
-        seq_length = self.sequence_length - 1
+        seq_length = captions.shape[1] - 1
         batch_size = captions.size(0)
         
         preds = torch.zeros(batch_size, seq_length, self.vocab_size).to(device)

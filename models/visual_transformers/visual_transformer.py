@@ -60,10 +60,11 @@ class VisualTransformerModel(nn.Module):
         embedded_target = self.pos_encoder(embedded_target)
         embedded_target = embedded_target.transpose(0,1)
 
+        sequence_length = target_captions.shape[1]
         output = self.transformer_decoder(
             tgt = embedded_target, 
             memory = encoded_images, 
-            tgt_mask = self.tgt_mask, # to avoid looking at the future tokens (the ones on the right)
+            tgt_mask = self.tgt_mask[:sequence_length, :sequence_length], # to avoid looking at the future tokens (the ones on the right)
         )
         
         preds = self.pred_linear(output).transpose(0, 1)

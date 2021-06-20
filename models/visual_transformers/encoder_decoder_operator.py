@@ -51,8 +51,7 @@ class EncoderDecoderOperator:
         dataloader = retrieve_train_dataloader(
             train_df,
             self.vocab,
-            batch_size=self.batch_size,
-            sequence_length=self.sequence_length
+            batch_size=self.batch_size
         )
 
         loss_func = nn.CrossEntropyLoss(ignore_index=self.vocab.stoi["<PAD>"])
@@ -79,14 +78,14 @@ class EncoderDecoderOperator:
             model.eval()
             print(f'Training set evaluation:')
             train_loss, train_levenshtein = TrainingUtils.evaluate_model_on_dataset(
-                model, train_df, self.sequence_length, self.batch_size, self.vocab, 'train'
+                model, train_df, None, self.batch_size, self.vocab, 'train'
             )
             train_losses.append(train_loss)
             train_levenshteins.append(train_levenshtein)
 
             print(f'Validation set evaluation:')
             val_loss, val_levenshtein = TrainingUtils.evaluate_model_on_dataset(
-                model, validation_df, self.sequence_length, self.batch_size, self.vocab, 'train')
+                model, validation_df, None, self.batch_size, self.vocab, 'train')
             val_losses.append(val_loss)
             val_levenshteins.append(val_levenshtein)
             model.train()
