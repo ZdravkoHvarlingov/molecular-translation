@@ -13,10 +13,11 @@ cycler==0.10.0
 decorator==5.0.7
 defusedxml==0.7.1
 deprecation==2.1.0
+efficientnet-pytorch==0.7.1
 entrypoints==0.3
-git+git://github.com/azaharyan/EfficientNet-PyTorch.git@master#egg=EfficientNet-PyTorch
 idna==2.10
 importlib-metadata==4.0.1
+importlib-resources==5.1.4
 ipykernel==5.5.3
 ipython==7.23.0
 ipython-genutils==0.2.0
@@ -74,6 +75,7 @@ torchvision==0.9.1+cu102
 tornado==6.1
 tqdm==4.60.0
 traitlets==5.0.5
+typed-ast==1.4.3
 typing-extensions==3.10.0.0
 urllib3==1.26.4
 wcwidth==0.2.5

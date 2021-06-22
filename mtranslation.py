@@ -70,10 +70,12 @@ def perform_action(args: Namespace):
         print('Visual transformer model chosen!')
         operator = VisualTransformer(batch_size=batch_size)
         perform_model_action(operator, data_file_path, action, num_epochs, model_state_file)
+
     elif model_name == 'efficient_net':
         print('EfficientNet+Transformer model chosen!')
         operator = EfficientNetTransformer(batch_size=batch_size)
         perform_model_action(operator, data_file_path, action, num_epochs, model_state_file)
+        
     else:
         print("Invalid model specified")
 
